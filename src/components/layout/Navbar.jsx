@@ -1,11 +1,11 @@
-import { Bell, ChevronDown, LogOut, User, Settings } from "lucide-react";
+import { Bell, ChevronDown, LogOut, User, Settings, Menu } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { selectUser, logoutUser } from "../../store/slices/authSlice";
 import { selectNotifications } from "../../store/slices/notificationSlice";
 
-export default function Navbar() {
+export default function Navbar({ onToggleMobileMenu }) {
   const dispatch   = useDispatch();
   const navigate   = useNavigate();
   const user       = useSelector(selectUser);
@@ -31,14 +31,22 @@ export default function Navbar() {
   const role     = user?.role ?? "ADMIN";
 
   return (
-    <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 z-20">
-      {/* Left side — breadcrumb placeholder */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <span className="font-medium text-gray-700">Smart Classroom Hub</span>
+    <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-6 flex-shrink-0 z-20">
+      {/* Left side — Mobile menu toggle button + Title */}
+      <div className="flex items-center gap-2 sm:gap-3 text-sm text-gray-400">
+        <button
+          onClick={onToggleMobileMenu}
+          className="p-2 -ml-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg lg:hidden transition"
+          aria-label="Open sidebar menu"
+          title="Toggle Navigation Menu"
+        >
+          <Menu size={22} />
+        </button>
+        <span className="font-semibold text-gray-800 text-sm sm:text-base truncate">Smart Classroom Hub</span>
       </div>
 
       {/* Right side */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Notifications Bell */}
         <button
           onClick={() => navigate("/notifications")}
@@ -47,7 +55,7 @@ export default function Navbar() {
         >
           <Bell size={20} />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center leading-none font-semibold">
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center leading-none font-semibold">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -57,7 +65,7 @@ export default function Navbar() {
         <div className="relative" ref={dropRef}>
           <button
             onClick={() => setDropOpen(!dropOpen)}
-            className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-100 rounded-lg transition"
+            className="flex items-center gap-2 px-1.5 py-1 sm:px-2 sm:py-1.5 hover:bg-gray-100 rounded-lg transition"
           >
             {/* Avatar */}
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">

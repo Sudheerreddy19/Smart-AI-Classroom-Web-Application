@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, CalendarDays, ClipboardCheck,
   BookOpen, Bot, Monitor, Leaf, BarChart3, Bell, Settings, ChevronLeft,
   LogOut, Building2, Cpu, ShieldCheck, User, FileText, Layers, TrendingUp,
-  Camera, Upload, CalendarRange, Bus,
+  Camera, Upload, CalendarRange, Bus, X,
 } from "lucide-react";
 import { useState } from "react";
 import { selectUser, logoutUser } from "../../store/slices/authSlice";
@@ -117,7 +117,7 @@ const ROLE_LABELS = {
   STUDENT:     "Student",
 };
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onMobileClose = () => {} }) {
   const dispatch   = useDispatch();
   const navigate   = useNavigate();
   const user       = useSelector(selectUser);
@@ -142,91 +142,130 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className={`${collapsed ? "w-[68px]" : "w-64"} bg-[#0f1729] text-white min-h-screen flex flex-col transition-all duration-300 relative flex-shrink-0`}>
-
-      {/* ── Logo ── */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-800 h-16">
-        <div className={`w-8 h-8 ${color} rounded-lg flex items-center justify-center flex-shrink-0`}>
-          <GraduationCap size={18} className="text-white" />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0">
-            <div className="font-bold text-white text-sm leading-tight truncate">Smart Classroom</div>
-            <div className="text-slate-400 text-xs leading-tight truncate">{label}</div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Nav ── */}
-      <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden">
-        {menus.map((menu) => {
-          const Icon   = menu.icon;
-          const badge  = menu.showBadge && unreadCount > 0;
-          return (
-            <NavLink key={menu.path} to={menu.path}
-              title={collapsed ? menu.title : undefined}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 mx-2 rounded-lg transition-all text-sm mb-0.5 ${
-                  isActive
-                    ? `${color} text-white shadow-sm`
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                }`
-              }
-            >
-              <div className="relative flex-shrink-0">
-                <Icon size={17} />
-                {badge && collapsed && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                )}
-              </div>
-              {!collapsed && (
-                <>
-                  <span className="flex-1 truncate">{menu.title}</span>
-                  {menu.badge && (
-                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 tracking-wide">
-                      {menu.badge}
-                    </span>
-                  )}
-                  {badge && (
-                    <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0 font-medium">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-          );
-        })}
-      </nav>
-
-      {/* ── Logout ── */}
-      <div className="border-t border-slate-800 p-2">
-        <button onClick={handleLogout} title={collapsed ? "Sign Out" : undefined}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-red-900/30 hover:text-red-400 transition text-sm">
-          <LogOut size={17} className="flex-shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
-        </button>
-      </div>
-
-      {/* ── User Profile ── */}
-      {!collapsed && (
-        <div className="border-t border-slate-800 px-4 py-3 flex items-center gap-3">
-          <div className={`w-8 h-8 ${color} rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-            {initials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-semibold truncate">{fullName}</div>
-            <div className="text-slate-400 text-xs truncate">{label}</div>
-          </div>
-          <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></div>
-        </div>
+    <>
+      {/* ── Mobile Backdrop Overlay ── */}
+      {mobileOpen && (
+        <div
+          onClick={onMobileClose}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+        />
       )}
 
-      {/* ── Collapse button ── */}
-      <button onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center text-white hover:bg-slate-600 z-10 shadow">
-        <ChevronLeft size={13} className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
-      </button>
-    </aside>
+      {/* ── Sidebar Container ── */}
+      <aside
+        className={`
+          fixed lg:static inset-y-0 left-0 z-50
+          ${collapsed ? "lg:w-[68px]" : "lg:w-64"}
+          w-72
+          bg-[#0f1729] text-white min-h-screen flex flex-col transition-all duration-300 flex-shrink-0
+          ${mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"}
+        `}
+      >
+        {/* ── Logo + Mobile Close ── */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800 h-16">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-8 h-8 ${color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <GraduationCap size={18} className="text-white" />
+            </div>
+            {(!collapsed || mobileOpen) && (
+              <div className="min-w-0">
+                <div className="font-bold text-white text-sm leading-tight truncate">Smart Classroom</div>
+                <div className="text-slate-400 text-xs leading-tight truncate">{label}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Close button on mobile */}
+          <button
+            onClick={onMobileClose}
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 lg:hidden"
+            aria-label="Close navigation"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* ── Nav ── */}
+        <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden">
+          {menus.map((menu) => {
+            const Icon   = menu.icon;
+            const badge  = menu.showBadge && unreadCount > 0;
+            return (
+              <NavLink
+                key={menu.path}
+                to={menu.path}
+                onClick={() => {
+                  if (mobileOpen) onMobileClose();
+                }}
+                title={collapsed && !mobileOpen ? menu.title : undefined}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 mx-2 rounded-lg transition-all text-sm mb-0.5 ${
+                    isActive
+                      ? `${color} text-white shadow-sm font-medium`
+                      : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  }`
+                }
+              >
+                <div className="relative flex-shrink-0">
+                  <Icon size={17} />
+                  {badge && collapsed && !mobileOpen && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </div>
+                {(!collapsed || mobileOpen) && (
+                  <>
+                    <span className="flex-1 truncate">{menu.title}</span>
+                    {menu.badge && (
+                      <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 tracking-wide">
+                        {menu.badge}
+                      </span>
+                    )}
+                    {badge && (
+                      <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0 font-medium">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* ── Logout ── */}
+        <div className="border-t border-slate-800 p-2">
+          <button
+            onClick={handleLogout}
+            title={collapsed && !mobileOpen ? "Sign Out" : undefined}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-red-900/30 hover:text-red-400 transition text-sm"
+          >
+            <LogOut size={17} className="flex-shrink-0" />
+            {(!collapsed || mobileOpen) && <span>Sign Out</span>}
+          </button>
+        </div>
+
+        {/* ── User Profile ── */}
+        {(!collapsed || mobileOpen) && (
+          <div className="border-t border-slate-800 px-4 py-3 flex items-center gap-3">
+            <div className={`w-8 h-8 ${color} rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-white text-xs font-semibold truncate">{fullName}</div>
+              <div className="text-slate-400 text-xs truncate">{label}</div>
+            </div>
+            <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></div>
+          </div>
+        )}
+
+        {/* ── Collapse button (Desktop only) ── */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full items-center justify-center text-white hover:bg-slate-600 z-10 shadow"
+        >
+          <ChevronLeft size={13} className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
+        </button>
+      </aside>
+    </>
   );
 }

@@ -26,9 +26,9 @@ export default function VoiceListeningIndicator({
   const isError = state === "ERROR";
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-2 select-none font-sans">
+    <div className="fixed bottom-3 left-3 sm:bottom-6 sm:left-6 z-50 flex flex-col items-start gap-2 select-none font-sans max-w-[calc(100vw-24px)] sm:max-w-sm">
       <div
-        className={`flex items-center gap-3 px-4 py-2.5 rounded-full shadow-lg border transition-all duration-300 max-w-sm ${
+        className={`flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full shadow-lg border transition-all duration-300 w-full sm:w-auto ${
           isStandby
             ? "bg-white/95 border-gray-200 shadow-sm"
             : isListening
