@@ -1,18 +1,88 @@
-# React + Vite
+# Smart Classroom Hub - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, role-based web interface for institutional classroom management, featuring real-time attendance tracking, student and staff administration, schedule management, and integration with an AI-powered face recognition microservice.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Key Features
 
-## React Compiler
+- **Role-Based Access Control (RBAC):** Custom interfaces and permissions for `SUPER_ADMIN`, `ADMIN`, `HOD`, `TEACHER`, and `STUDENT`.
+- **Attendance Management:** Automated multi-face attendance capture via webcam and real-time report generation.
+- **Academic Administration:** Student directories, semester tracking, branch and department management, timetable builder.
+- **Hardware & Device Monitoring:** Classroom device tracking and environmental status indicators.
+- **Legal & Compliance:** Built-in Privacy Policy and Terms of Service pages.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+---
 
-Note: This will impact Vite dev & build performances.
+## 🛠️ Tech Stack
 
-## Expanding the ESLint configuration
+- **Framework:** React 19 + Vite 8
+- **Styling:** Tailwind CSS v4
+- **State Management:** Redux Toolkit + React-Redux
+- **Routing:** React Router v7
+- **HTTP Client:** Axios with JWT request interception & auto-refresh
+- **Icons & Visuals:** Lucide React & Recharts
+- **Notifications:** React Hot Toast
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## 📂 Project Structure
+
+```text
+smart-classroom-frontend/
+├── public/                 # Static assets (favicons, SVG marks)
+├── src/
+│   ├── api/                # Axios API services by domain
+│   ├── components/         # Reusable UI components & layouts
+│   ├── pages/              # Role-specific & functional page views
+│   ├── routes/             # AppRoutes, PrivateRoute & RoleRoute
+│   ├── store/              # Redux slices & store configuration
+│   ├── styles/             # Global CSS
+│   ├── App.jsx             # Root application component
+│   └── main.jsx            # Application entry point
+├── .env.example            # Environment variables template
+├── package.json            # Project dependencies & scripts
+├── vite.config.js          # Vite configuration & dev proxy
+└── README.md
+```
+
+---
+
+## ⚙️ Getting Started
+
+### 1. Prerequisites
+- **Node.js:** v18.0.0 or higher
+- **npm:** v9.0.0 or higher
+- **Backend API:** Spring Boot backend running on `http://localhost:8080` (optional during frontend-only development)
+- **Face Service:** Python OpenCV/FastAPI service running on `http://localhost:8000` (for face registration)
+
+### 2. Installation
+```bash
+git clone <your-repo-url>
+cd smart-classroom-frontend
+npm install
+```
+
+### 3. Environment Configuration
+Copy the sample environment file:
+```bash
+cp .env.example .env
+```
+In development, the built-in Vite dev proxy automatically forwards all `/api/*` calls to `http://localhost:8080/api/*`.
+
+### 4. Running the Development Server
+```bash
+npm run dev
+```
+The app will run at `http://localhost:5173`.
+
+### 5. Production Build
+```bash
+npm run build
+```
+Build output is generated inside the `dist/` directory.
+
+---
+
+## 📜 License
+Internal Institutional Software. All rights reserved.
