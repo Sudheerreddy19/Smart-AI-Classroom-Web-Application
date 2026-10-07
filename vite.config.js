@@ -7,9 +7,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Forward every /api/* call to the Spring Boot backend
+      // Forward every /api/* call to the Spring Boot backend on Render
       "/api": {
-        target: "http://localhost:8080",
+        target: "https://smart-ai-classroom-server.onrender.com",
         changeOrigin: true,
         secure: false,
       },

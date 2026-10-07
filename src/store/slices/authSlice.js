@@ -48,11 +48,16 @@ export const loginUser = createAsyncThunk(
     } catch (err) {
       const msg =
         err.response?.data?.message ||
+        err.response?.data?.error ||
         (err.response?.status === 401
           ? "Invalid email or password."
           : err.response?.status === 400
           ? "Please check your email and password."
-          : "Login failed. Make sure the server is running.");
+          : err.response?.status === 404
+          ? "No account found with this email."
+          : err.response?.status >= 500
+          ? "Server error. Please check server logs."
+          : "Unable to connect to server. Check your internet connection.");
       return rejectWithValue(msg);
     }
   }

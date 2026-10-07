@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
  * In dev: Vite proxy forwards /api/* → http://localhost:8080/api/*
  * In prod: set VITE_API_URL=https://your-domain.com in .env
  */
-const BASE_URL = import.meta.env.VITE_API_URL || "/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "https://smart-ai-classroom-server.onrender.com/api";
 
 const axiosClient = axios.create({
   baseURL: BASE_URL,
