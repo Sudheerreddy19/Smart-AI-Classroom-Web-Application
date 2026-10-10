@@ -48,13 +48,19 @@ export default function Environment() {
   /* Current reading for selected room */
   const current = allData.find((d) => String(d.classroomId) === selectedRoom) || allData[0] || {};
 
+  const isRoomActive = current.roomState === "ACTIVE" || current.roomState === "OCCUPIED";
+  const isFanOn = current.fanStatus === "ON";
+  const isLightOn = current.lightStatus === "ON";
+  const hasGasLeak = current.gasLeak === true;
+  const isDark = current.isDark === true;
+
   const metricCards = [
+    { label:"Room State (PIR)", value: current.roomState || (isRoomActive ? "ACTIVE" : "EMPTY"), sub: isRoomActive ? "Occupied" : "Empty", subColor: isRoomActive ? "text-green-600 font-bold" : "text-gray-500", icon: Users, bg: isRoomActive ? "bg-green-100" : "bg-gray-100", ic: isRoomActive ? "text-green-600" : "text-gray-500" },
     { label:"Temperature", value: current.temperature != null ? `${current.temperature} °C` : "—", sub: "Comfortable", subColor:"text-green-600", icon: Thermometer, bg:"bg-orange-50", ic:"text-orange-500" },
     { label:"Humidity",    value: current.humidity    != null ? `${current.humidity} %`    : "—", sub: "Normal",      subColor:"text-green-600", icon: Droplets,    bg:"bg-blue-50",   ic:"text-blue-500"   },
-    { label:"Air Quality", value: current.airQualityIndex != null ? `${current.airQualityIndex} AQI` : "—", sub: "Good", subColor:"text-green-600", icon: Leaf, bg:"bg-green-50", ic:"text-green-500" },
-    { label:"Light",       value: current.lightLevel  != null ? `${current.lightLevel} lux`: "—", sub: "Optimal",    subColor:"text-green-600", icon: Wind,        bg:"bg-yellow-50", ic:"text-yellow-500" },
-    { label:"Noise",       value: current.noiseLevel  != null ? `${current.noiseLevel} dB` : "—", sub: "Moderate",   subColor:"text-orange-600",icon: Volume2,     bg:"bg-red-50",    ic:"text-red-500"    },
-    { label:"CO₂ Level",   value: current.co2Level    != null ? `${current.co2Level} ppm`  : "—", sub: "Normal",     subColor:"text-green-600", icon: Users,       bg:"bg-purple-50", ic:"text-purple-500" },
+    { label:"Light Level", value: current.lightLevel  != null ? `${current.lightLevel} %`  : (isDark ? "Dark" : "Bright"), sub: isDark ? "Dark: YES" : "Dark: NO", subColor: isDark ? "text-indigo-600" : "text-yellow-600", icon: Wind, bg:"bg-yellow-50", ic:"text-yellow-500" },
+    { label:"Gas Safety",  value: hasGasLeak ? "LEAK ALERT" : "Normal Safe", sub: current.gasPpm != null ? `${current.gasPpm} PPM` : (hasGasLeak ? "Gas Leak: YES" : "Gas Leak: NO"), subColor: hasGasLeak ? "text-red-600 font-bold" : "text-green-600", icon: AlertTriangle, bg: hasGasLeak ? "bg-red-100" : "bg-emerald-50", ic: hasGasLeak ? "text-red-600" : "text-emerald-600" },
+    { label:"Fan & Light", value: `Fan:${current.fanStatus || (isFanOn ? "ON" : "OFF")} | Lgt:${current.lightStatus || (isLightOn ? "ON" : "OFF")}`, sub: isRoomActive ? "Auto Controlled" : "Auto Powered Off", subColor:"text-blue-600", icon: Leaf, bg:"bg-purple-50", ic:"text-purple-600" },
   ];
 
   /* Chart data from history */
@@ -142,18 +148,19 @@ export default function Environment() {
           {loading ? <PageLoader /> : (
             <div className="space-y-3">
               {[
-                { label:"Temperature",  value: current.temperature != null ? `${current.temperature} °C` : "—", ok: true },
-                { label:"Humidity",     value: current.humidity    != null ? `${current.humidity} %`     : "—", ok: true },
-                { label:"Air Quality",  value: current.airQualityIndex != null ? `${current.airQualityIndex} AQI` : "—", ok: true },
-                { label:"Light",        value: current.lightLevel  != null ? `${current.lightLevel} lux` : "—", ok: true },
-                { label:"Noise Level",  value: current.noiseLevel  != null ? `${current.noiseLevel} dB`  : "—", ok: current.noiseLevel < 60 },
-                { label:"CO₂",          value: current.co2Level    != null ? `${current.co2Level} ppm`   : "—", ok: current.co2Level < 800 },
+                { label:"Room Occupancy", value: current.roomState || (isRoomActive ? "ACTIVE" : "EMPTY"), ok: isRoomActive },
+                { label:"Fan Control",   value: current.fanStatus || (isFanOn ? "ON" : "OFF"),   ok: isFanOn },
+                { label:"Light Control", value: current.lightStatus || (isLightOn ? "ON" : "OFF"), ok: isLightOn },
+                { label:"Temperature",   value: current.temperature != null ? `${current.temperature} °C` : "—", ok: true },
+                { label:"Humidity",      value: current.humidity    != null ? `${current.humidity} %`     : "—", ok: true },
+                { label:"Light Level",   value: current.lightLevel  != null ? `${current.lightLevel} %` : (isDark ? "Dark (YES)" : "Bright (NO)"), ok: true },
+                { label:"Gas Safety",    value: hasGasLeak ? "GAS LEAK ALERT!" : "No Leak (Safe)", ok: !hasGasLeak },
               ].map((s) => (
                 <div key={s.label} className="flex items-center justify-between">
                   <span className="text-gray-600 text-xs">{s.label}</span>
                   <span className="text-xs font-medium flex items-center gap-1.5">
                     {s.value}
-                    <span className={`w-2 h-2 rounded-full ${s.ok ? "bg-green-400" : "bg-orange-400"}`}></span>
+                    <span className={`w-2 h-2 rounded-full ${s.ok ? "bg-green-500" : (s.label.includes("Gas") ? "bg-red-500" : "bg-gray-400")}`}></span>
                   </span>
                 </div>
               ))}
@@ -183,7 +190,7 @@ export default function Environment() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
-                  {["Classroom","Temp (°C)","Humidity (%)","AQI","Light (lux)","Noise (dB)","CO₂ (ppm)","Recorded","Action"].map((h) => (
+                  {["Classroom","PIR State","Temp (°C)","Humidity (%)","Light Level","Gas Safety","Fan","Light","Recorded","Action"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
                   ))}
                 </tr>
@@ -191,15 +198,36 @@ export default function Environment() {
               <tbody>
                 {allData.map((d, i) => {
                   const room = classrooms.find((c) => c.id === d.classroomId);
+                  const isAct = d.roomState === "ACTIVE";
+                  const gasAlert = d.gasLeak === true;
                   return (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition">
                       <td className="px-4 py-3 font-medium text-gray-800">{room?.roomNumber || `Room ${d.classroomId}`}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.temperature ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.humidity ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.airQualityIndex ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.lightLevel ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.noiseLevel ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.co2Level ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${isAct ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                          {d.roomState || "EMPTY"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{d.temperature != null ? `${d.temperature}°C` : "—"}</td>
+                      <td className="px-4 py-3 text-gray-600">{d.humidity != null ? `${d.humidity}%` : "—"}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {d.lightLevel != null ? `${d.lightLevel}%` : (d.isDark ? "Dark (YES)" : "Bright")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${gasAlert ? "bg-red-100 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+                          {gasAlert ? "LEAK ALERT" : "Normal Safe"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.fanStatus === "ON" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                          {d.fanStatus || "OFF"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.lightStatus === "ON" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+                          {d.lightStatus || "OFF"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
                         {d.recordedAt ? new Date(d.recordedAt).toLocaleTimeString() : "—"}
                       </td>
