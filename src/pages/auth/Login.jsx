@@ -99,6 +99,11 @@ export default function Login() {
             {loading && <Loader2 size={16} className="animate-spin" />}
             {loading ? "Signing in..." : "Sign In"}
           </button>
+          {loading && (
+            <p className="text-xs text-amber-600 text-center animate-pulse mt-1">
+              Connecting to cloud server... (takes ~20-30s if waking up)
+            </p>
+          )}
         </form>
 
         {/* No demo credentials shown — contact your administrator for access */}
