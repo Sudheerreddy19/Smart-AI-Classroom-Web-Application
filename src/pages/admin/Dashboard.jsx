@@ -281,23 +281,25 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-orange-50 rounded-lg p-2.5 text-center">
                 <Thermometer size={16} className="text-orange-500 mx-auto mb-1"/>
-                <div className="text-sm font-bold text-gray-800">{envSummary.temperature??28}°C</div>
-                <div className="text-xs text-green-600">Normal</div>
+                <div className="text-sm font-bold text-gray-800">{envSummary.temperature != null ? `${envSummary.temperature}°C` : "—"}</div>
+                <div className="text-xs text-green-600 font-medium">{envSummary.roomState || "ACTIVE"}</div>
               </div>
               <div className="bg-blue-50 rounded-lg p-2.5 text-center">
                 <Droplets size={16} className="text-blue-500 mx-auto mb-1"/>
-                <div className="text-sm font-bold text-gray-800">{envSummary.humidity??56}%</div>
-                <div className="text-xs text-green-600">Normal</div>
+                <div className="text-sm font-bold text-gray-800">{envSummary.humidity != null ? `${envSummary.humidity}%` : "—"}</div>
+                <div className="text-xs text-blue-600 font-medium">Humidity</div>
               </div>
-              <div className="bg-green-50 rounded-lg p-2.5 text-center">
-                <Leaf size={16} className="text-green-500 mx-auto mb-1"/>
-                <div className="text-sm font-bold text-gray-800">{envSummary.airQualityIndex??42} AQI</div>
-                <div className="text-xs text-green-600">Good</div>
+              <div className="bg-yellow-50 rounded-lg p-2.5 text-center">
+                <Wind size={16} className="text-yellow-600 mx-auto mb-1"/>
+                <div className="text-sm font-bold text-gray-800">{envSummary.lightLevel != null ? `${envSummary.lightLevel}%` : "—"}</div>
+                <div className="text-xs text-indigo-600 font-medium">{envSummary.isDark ? "Dark: YES" : "Dark: NO"}</div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                <Wind size={16} className="text-gray-500 mx-auto mb-1"/>
-                <div className="text-sm font-bold text-gray-800">{envSummary.co2Level??620} ppm</div>
-                <div className="text-xs text-green-600">Normal</div>
+              <div className={`rounded-lg p-2.5 text-center ${envSummary.gasLeak ? "bg-red-100" : "bg-emerald-50"}`}>
+                <AlertTriangle size={16} className={`mx-auto mb-1 ${envSummary.gasLeak ? "text-red-600" : "text-emerald-600"}`}/>
+                <div className={`text-sm font-bold ${envSummary.gasLeak ? "text-red-700" : "text-gray-800"}`}>
+                  {envSummary.gasLeak ? "LEAK ALERT" : "Gas Safe"}
+                </div>
+                <div className="text-xs text-gray-500 truncate">{envSummary.roomNumber || "LH-101"}</div>
               </div>
             </div>
           </div>

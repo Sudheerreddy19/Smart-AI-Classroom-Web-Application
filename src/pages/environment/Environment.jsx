@@ -12,23 +12,30 @@ export default function Environment() {
   const dispatch = useDispatch();
   const { list: classrooms } = useSelector(selectClassrooms);
 
-  const [allData, setAllData]     = useState([]);
-  const [history, setHistory]     = useState([]);
-  const [loading, setLoading]     = useState(false);
+  const [allData, setAllData]         = useState([]);
+  const [history, setHistory]         = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState("");
-  const [hours, setHours]         = useState(24);
+  const [hours, setHours]             = useState(24);
   const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => { dispatch(fetchClassrooms()); }, [dispatch]);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    else setIsRefreshing(true);
+
     try {
       const { data } = await environmentApi.getAll();
       setAllData(Array.isArray(data) ? data : []);
       setLastUpdated(new Date());
-    } catch { setAllData([]); }
-    finally { setLoading(false); }
+    } catch {
+      if (isInitial) setAllData([]);
+    } finally {
+      if (isInitial) setLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
 
   const loadHistory = useCallback(async () => {
@@ -39,10 +46,20 @@ export default function Environment() {
     } catch { setHistory([]); }
   }, [selectedRoom, hours]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  // Initial load + 5-second auto-refresh interval
+  useEffect(() => {
+    loadAll(true);
+    const interval = setInterval(() => {
+      loadAll(false);
+      loadHistory();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loadAll, loadHistory]);
+
   useEffect(() => {
     if (classrooms.length && !selectedRoom) setSelectedRoom(String(classrooms[0]?.id || ""));
   }, [classrooms, selectedRoom]);
+
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
   /* Current reading for selected room */
@@ -55,12 +72,12 @@ export default function Environment() {
   const isDark = current.isDark === true;
 
   const metricCards = [
-    { label:"Room State (PIR)", value: current.roomState || (isRoomActive ? "ACTIVE" : "EMPTY"), sub: isRoomActive ? "Occupied" : "Empty", subColor: isRoomActive ? "text-green-600 font-bold" : "text-gray-500", icon: Users, bg: isRoomActive ? "bg-green-100" : "bg-gray-100", ic: isRoomActive ? "text-green-600" : "text-gray-500" },
+    { label:"Room State (PIR)", value: current.roomState || (isRoomActive ? "ACTIVE" : "EMPTY"), sub: current.motionDetected != null ? (current.motionDetected ? "Motion: YES 🟢" : "Motion: NO ⚪") : (isRoomActive ? "Occupied" : "Empty"), subColor: isRoomActive ? "text-green-600 font-bold" : "text-gray-500", icon: Users, bg: isRoomActive ? "bg-green-100" : "bg-gray-100", ic: isRoomActive ? "text-green-600" : "text-gray-500" },
     { label:"Temperature", value: current.temperature != null ? `${current.temperature} °C` : "—", sub: "Comfortable", subColor:"text-green-600", icon: Thermometer, bg:"bg-orange-50", ic:"text-orange-500" },
     { label:"Humidity",    value: current.humidity    != null ? `${current.humidity} %`    : "—", sub: "Normal",      subColor:"text-green-600", icon: Droplets,    bg:"bg-blue-50",   ic:"text-blue-500"   },
-    { label:"Light Level", value: current.lightLevel  != null ? `${current.lightLevel} %`  : (isDark ? "Dark" : "Bright"), sub: isDark ? "Dark: YES" : "Dark: NO", subColor: isDark ? "text-indigo-600" : "text-yellow-600", icon: Wind, bg:"bg-yellow-50", ic:"text-yellow-500" },
+    { label:"Light Level", value: current.lightLevel  != null ? `${current.lightLevel} %`  : (isDark ? "Dark" : "Bright"), sub: `ADC: ${current.ldrRaw ?? "—"} | ${isDark ? "Dark: YES" : "Dark: NO"}`, subColor: isDark ? "text-indigo-600 font-medium" : "text-yellow-600 font-medium", icon: Wind, bg:"bg-yellow-50", ic:"text-yellow-500" },
     { label:"Gas Safety",  value: hasGasLeak ? "LEAK ALERT" : "Normal Safe", sub: current.gasPpm != null ? `${current.gasPpm} PPM` : (hasGasLeak ? "Gas Leak: YES" : "Gas Leak: NO"), subColor: hasGasLeak ? "text-red-600 font-bold" : "text-green-600", icon: AlertTriangle, bg: hasGasLeak ? "bg-red-100" : "bg-emerald-50", ic: hasGasLeak ? "text-red-600" : "text-emerald-600" },
-    { label:"Fan & Light", value: `Fan:${current.fanStatus || (isFanOn ? "ON" : "OFF")} | Lgt:${current.lightStatus || (isLightOn ? "ON" : "OFF")}`, sub: isRoomActive ? "Auto Controlled" : "Auto Powered Off", subColor:"text-blue-600", icon: Leaf, bg:"bg-purple-50", ic:"text-purple-600" },
+    { label:"Fan & Light", value: `Fan:${current.fanStatus || (isFanOn ? "ON" : "OFF")} | Lgt:${current.lightStatus || (isLightOn ? "ON" : "OFF")}`, sub: `Dev: ${current.deviceId || "ESP32_01"}`, subColor:"text-blue-600", icon: Leaf, bg:"bg-purple-50", ic:"text-purple-600" },
   ];
 
   /* Chart data from history */
@@ -75,14 +92,30 @@ export default function Environment() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Environment</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Real-time environmental monitoring of classrooms.</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">Environment</h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live (5s)
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 mt-0.5">Real-time environmental monitoring of classrooms from hardware sensors.</p>
         </div>
         <div className="flex items-center gap-3">
-          {lastUpdated && <span className="text-xs text-gray-400">Updated {lastUpdated.toLocaleTimeString()}</span>}
-          <button onClick={loadAll} className="p-2 text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"><RefreshCw size={16} /></button>
+          {lastUpdated && (
+            <span className="text-xs text-gray-400">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={() => { loadAll(false); loadHistory(); }}
+            title="Refresh Now"
+            className="p-2 text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+          >
+            <RefreshCw size={16} className={isRefreshing ? "animate-spin text-blue-600" : ""} />
+          </button>
           <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">
             <Download size={16} /> Export Report
           </button>
