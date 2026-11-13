@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { GraduationCap, Eye, EyeOff, Loader2 } from "lucide-react";
+import { GraduationCap, Eye, EyeOff, Loader2, CheckCircle2, CloudOff } from "lucide-react";
 import { loginUser, selectAuth } from "../../store/slices/authSlice";
+
+const API_ROOT = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
+  "https://smart-ai-classroom-server.onrender.com";
 
 export default function Login() {
   const dispatch = useDispatch();
@@ -12,6 +15,43 @@ export default function Login() {
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
+
+  // ── Server warm-up state ──────────────────────────────────────────────
+  // "checking" → "waking" → "ready" | "offline"
+  const [serverStatus, setServerStatus] = useState("checking");
+  const pingStarted = useRef(false);
+
+  useEffect(() => {
+    if (pingStarted.current) return;
+    pingStarted.current = true;
+
+    const controller = new AbortController();
+    const start = Date.now();
+
+    fetch(`${API_ROOT}/`, { signal: controller.signal, cache: "no-store" })
+      .then((res) => {
+        if (res.ok) {
+          const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+          console.log(`[warm-up] Server ready in ${elapsed}s`);
+          setServerStatus("ready");
+        } else {
+          setServerStatus("offline");
+        }
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") setServerStatus("offline");
+      });
+
+    // After 3 seconds of waiting, switch label to "waking"
+    const timer = setTimeout(() => {
+      setServerStatus((prev) => (prev === "checking" ? "waking" : prev));
+    }, 3000);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -23,6 +63,30 @@ export default function Login() {
       }
     });
   };
+
+  // ── Status badge ──────────────────────────────────────────────────────
+  const statusBadge = {
+    checking: {
+      icon: <Loader2 size={14} className="animate-spin text-blue-500" />,
+      text: "Connecting to server...",
+      color: "text-blue-600 bg-blue-50 border-blue-200",
+    },
+    waking: {
+      icon: <Loader2 size={14} className="animate-spin text-amber-500" />,
+      text: "Waking up cloud server (~30s on free tier)...",
+      color: "text-amber-700 bg-amber-50 border-amber-200",
+    },
+    ready: {
+      icon: <CheckCircle2 size={14} className="text-emerald-500" />,
+      text: "Server online — ready to sign in!",
+      color: "text-emerald-700 bg-emerald-50 border-emerald-200",
+    },
+    offline: {
+      icon: <CloudOff size={14} className="text-red-500" />,
+      text: "Server may be starting up. Login will retry automatically.",
+      color: "text-red-700 bg-red-50 border-red-200",
+    },
+  }[serverStatus];
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -39,7 +103,13 @@ export default function Login() {
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">Welcome back</h1>
-        <p className="text-gray-500 text-sm text-center mb-8">Sign in to your account to continue</p>
+        <p className="text-gray-500 text-sm text-center mb-4">Sign in to your account to continue</p>
+
+        {/* Server status badge */}
+        <div className={`flex items-center gap-2 px-3 py-2 mb-4 rounded-lg border text-xs font-medium ${statusBadge.color}`}>
+          {statusBadge.icon}
+          <span>{statusBadge.text}</span>
+        </div>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
