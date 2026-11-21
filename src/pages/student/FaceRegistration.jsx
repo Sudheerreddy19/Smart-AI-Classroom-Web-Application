@@ -432,6 +432,25 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
   const [stage, setStage]             = useState("aligning");
   const [statusMsg, setStatusMsg]     = useState("");
   const [elapsed, setElapsed]         = useState(0);
+  const [frameProgress, setFrameProgress] = useState(0);
+
+  // Live frame counter during capture stage (1 to 20 frames)
+  useEffect(() => {
+    let frameTimer = null;
+    if (stage === "capturing") {
+      setFrameProgress(1);
+      frameTimer = setInterval(() => {
+        setFrameProgress(prev => {
+          if (prev >= 20) return 20;
+          return prev + 1;
+        });
+      }, 140);
+    } else {
+      setFrameProgress(0);
+      clearInterval(frameTimer);
+    }
+    return () => clearInterval(frameTimer);
+  }, [stage]);
 
   // Activate browser webcam for alignment
   useEffect(() => {
@@ -804,19 +823,39 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
             {stage === "capturing" && (
               <>
                 <div style={{
-                  width: 100,
-                  height: 100,
+                  width: 80,
+                  height: 80,
                   borderRadius: "50%",
-                  border: "3px solid #38bdf8",
+                  border: "4px solid #38bdf8",
                   borderTopColor: "transparent",
                   animation: "spin 1s linear infinite",
                   marginBottom: 16
                 }} />
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 6 }}>
-                  Recording Biometric Encodings…
+                <div style={{ fontSize: 17, fontWeight: 800, color: "#f8fafc", marginBottom: 4 }}>
+                  Capturing Biometric Frames
                 </div>
-                <div style={{ fontSize: 13, color: "#94a3b8", maxWidth: 360 }}>
-                  Camera released to Class AI Agent. Capturing 20 frames from laptop webcam. Hold still!
+                
+                {/* Real-time Frame Counter & Progress Bar */}
+                <div style={{ width: "100%", maxWidth: 360, marginTop: 10, marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, fontWeight: 800, color: "#38bdf8", marginBottom: 6 }}>
+                    <span>Frame Progress</span>
+                    <span style={{ background: "#1e293b", padding: "2px 8px", borderRadius: 6, border: "1px solid #334155" }}>
+                      {frameProgress} / 20 Frames
+                    </span>
+                  </div>
+                  <div style={{ width: "100%", height: 12, background: "#0f172a", borderRadius: 99, overflow: "hidden", border: "1px solid #334155" }}>
+                    <div style={{
+                      width: `${(frameProgress / 20) * 100}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg, #38bdf8, #22c55e)",
+                      borderRadius: 99,
+                      transition: "width 0.15s ease-out"
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 360 }}>
+                  AI Agent is reading 20 facial angles (frontal, tilted, micro-expressions). Hold still!
                 </div>
               </>
             )}
@@ -829,23 +868,45 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                 <div style={{ fontSize: 18, fontWeight: 800, color: "#4ade80", marginBottom: 6 }}>
                   Face Enrolled Successfully!
                 </div>
-                <div style={{ fontSize: 13, color: "#cbd5e1" }}>
+                <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>
                   {statusMsg}
+                </div>
+                <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700 }}>
+                  ✓ 20 biometric frames encoded and registered
                 </div>
               </>
             )}
 
             {stage === "error" && (
               <>
-                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 0 25px rgba(239, 68, 68, 0.6)" }}>
-                  <XCircle size={40} color="#fff" />
+                <div style={{ width: 68, height: 68, borderRadius: "50%", background: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14, boxShadow: "0 0 25px rgba(239, 68, 68, 0.6)" }}>
+                  <XCircle size={38} color="#fff" />
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#f87171", marginBottom: 6 }}>
-                  Capture Failed
-                </div>
-                <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>
-                  {statusMsg}
-                </div>
+
+                {statusMsg.includes("DUPLICATE FACE") || statusMsg.includes("already registered to") ? (
+                  <div style={{ background: "#450a0a", border: "1.5px solid #ef4444", borderRadius: 14, padding: "14px 16px", textAlign: "left", width: "100%", marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fca5a5", fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                      <AlertTriangle size={18} color="#ef4444" />
+                      DUPLICATE FACE DETECTED & REJECTED
+                    </div>
+                    <div style={{ fontSize: 13, color: "#fecaca", lineHeight: 1.5, marginBottom: 10 }}>
+                      {statusMsg}
+                    </div>
+                    <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fde68a", lineHeight: 1.5 }}>
+                      <strong>Biometric Security Policy:</strong> A student's face can only be registered once. The same face cannot be registered under multiple roll numbers.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#f87171", marginBottom: 6 }}>
+                      Capture Failed
+                    </div>
+                    <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>
+                      {statusMsg}
+                    </div>
+                  </>
+                )}
+
                 <button
                   onClick={() => setStage("aligning")}
                   style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
