@@ -458,31 +458,197 @@ export default function FaceRegistration() {
 
 // ── Active Biometric Capture & Face Alignment Modal ────────────────────────────
 function CaptureScreenModal({ student, elapsed, onClose }) {
+  const videoRef      = useRef(null);
+  const streamRef     = useRef(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [isAligned,   setIsAligned]   = useState(false);
+  const [alignmentMsg, setAlignmentMsg] = useState("Position face inside the oval");
+
+  // Activate browser webcam
+  useEffect(() => {
+    let active = true;
+    let stream = null;
+
+    async function initCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user"
+          },
+          audio: false
+        });
+        if (!active) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play().catch(() => {});
+            setCameraReady(true);
+          };
+        }
+      } catch (err) {
+        console.warn("Browser camera access error:", err);
+        setCameraError("Camera permission needed. Please allow webcam access.");
+      }
+    }
+
+    initCamera();
+
+    // Alignment verification loop
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 120;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    const interval = setInterval(async () => {
+      if (!videoRef.current || videoRef.current.readyState < 2) return;
+      const v = videoRef.current;
+
+      // Try browser native FaceDetector if available
+      if (window.FaceDetector) {
+        try {
+          const detector = new window.FaceDetector({ fastMode: true });
+          const faces = await detector.detect(v);
+          if (faces.length === 0) {
+            setIsAligned(false);
+            setAlignmentMsg("POSITION FACE INSIDE OVAL");
+            return;
+          }
+          if (faces.length > 1) {
+            setIsAligned(false);
+            setAlignmentMsg("MULTIPLE FACES — ONLY 1 PERSON");
+            return;
+          }
+          const box = faces[0].boundingBox;
+          const vW = v.videoWidth || 640;
+          const vH = v.videoHeight || 480;
+          const faceCx = box.x + box.width / 2;
+          const faceCy = box.y + box.height / 2;
+          const dx = Math.abs(faceCx - vW / 2);
+          const dy = Math.abs(faceCy - vH / 2);
+
+          if (dx > vW * 0.16) {
+            setIsAligned(false);
+            setAlignmentMsg("CENTER FACE HORIZONTALLY");
+            return;
+          }
+          if (dy > vH * 0.16) {
+            setIsAligned(false);
+            setAlignmentMsg("CENTER FACE VERTICALLY");
+            return;
+          }
+          if (box.height < vH * 0.28) {
+            setIsAligned(false);
+            setAlignmentMsg("MOVE CLOSER TO CAMERA");
+            return;
+          }
+          setIsAligned(true);
+          setAlignmentMsg("FACE ALIGNED & CLEAR ✓");
+          return;
+        } catch (e) {}
+      }
+
+      // Fast Canvas Luminance & Sharpness Analyzer
+      ctx.drawImage(v, 0, 0, 160, 120);
+      try {
+        const imgData = ctx.getImageData(0, 0, 160, 120);
+        const data = imgData.data;
+        const cx = 80;
+        const cy = 58;
+        const rx = 36;
+        const ry = 48;
+
+        let centerPixels = 0;
+        let skinPixels = 0;
+        let totalLum = 0;
+        let edgeGrad = 0;
+
+        for (let y = 2; y < 118; y += 3) {
+          for (let x = 2; x < 158; x += 3) {
+            const normDist = ((x - cx) ** 2) / (rx ** 2) + ((y - cy) ** 2) / (ry ** 2);
+            if (normDist <= 1.0) {
+              centerPixels++;
+              const idx = (y * 160 + x) * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+              const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+              totalLum += lum;
+
+              if (r > 60 && g > 40 && b > 20 && r > g && r > b && (r - g) >= 8) {
+                skinPixels++;
+              }
+
+              const left = (y * 160 + (x - 2)) * 4;
+              const right = (y * 160 + (x + 2)) * 4;
+              edgeGrad += Math.abs(r - data[left]) + Math.abs(r - data[right]);
+            }
+          }
+        }
+
+        const avgLum = totalLum / Math.max(1, centerPixels);
+        const skinRatio = skinPixels / Math.max(1, centerPixels);
+        const sharpness = edgeGrad / Math.max(1, centerPixels);
+
+        if (avgLum < 25) {
+          setIsAligned(false);
+          setAlignmentMsg("LIGHTING TOO DARK — FACE LIGHT");
+        } else if (skinRatio < 0.14) {
+          setIsAligned(false);
+          setAlignmentMsg("POSITION FACE INSIDE OVAL");
+        } else if (sharpness < 5) {
+          setIsAligned(false);
+          setAlignmentMsg("HOLD STILL — UNBLURRING");
+        } else {
+          setIsAligned(true);
+          setAlignmentMsg("FACE ALIGNED & CLEAR ✓");
+        }
+      } catch (err) {}
+    }, 150);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
   return (
     <div style={{
       position: "fixed",
       inset: 0,
-      background: "rgba(15, 23, 42, 0.85)",
+      background: "rgba(15, 23, 42, 0.88)",
       backdropFilter: "blur(8px)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       zIndex: 9999,
-      padding: 20
+      padding: 16
     }}>
       <div style={{
         background: "#0f172a",
-        border: "1.5px solid #38bdf8",
-        borderRadius: 20,
-        maxWidth: 520,
+        border: `2px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
+        borderRadius: 22,
+        maxWidth: 540,
         width: "100%",
-        padding: "24px 28px",
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.2)",
+        padding: "22px 26px",
+        boxShadow: isAligned
+          ? "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(34, 197, 94, 0.25)"
+          : "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(239, 68, 68, 0.25)",
         color: "#f8fafc",
-        fontFamily: "'Inter', sans-serif"
+        fontFamily: "'Inter', sans-serif",
+        transition: "border-color 0.3s, box-shadow 0.3s"
       }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, borderBottom: "1px solid #1e293b", paddingBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, borderBottom: "1px solid #1e293b", paddingBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{
               display: "inline-flex",
@@ -491,17 +657,18 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
               width: 32,
               height: 32,
               borderRadius: "50%",
-              background: "#ef4444",
-              boxShadow: "0 0 12px #ef4444"
+              background: isAligned ? "#16a34a" : "#dc2626",
+              boxShadow: isAligned ? "0 0 12px #22c55e" : "0 0 12px #ef4444",
+              transition: "all 0.3s"
             }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fff", animation: "ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite" }} />
             </span>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: "#f8fafc", letterSpacing: "0.02em" }}>
-                Biometric Face Capture Active
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#f8fafc" }}>
+                Live Biometric Face Capture
               </div>
-              <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                Laptop camera is verifying face alignment
+              <div style={{ fontSize: 12, color: isAligned ? "#4ade80" : "#f87171", fontWeight: 600 }}>
+                {isAligned ? "✓ Face Aligned & Clear" : "● Align Face Inside Oval"}
               </div>
             </div>
           </div>
@@ -510,74 +677,110 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
           </div>
         </div>
 
-        {/* Biometric Scanning Radar Graphic */}
+        {/* Real Webcam Viewport with Interactive Alignment Oval */}
         <div style={{
           position: "relative",
-          height: 180,
-          background: "radial-gradient(circle, #1e293b 0%, #0f172a 75%)",
+          height: 250,
+          background: "#020617",
           borderRadius: 16,
-          border: "1px solid #334155",
+          border: `2px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
+          overflow: "hidden",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: 20,
-          overflow: "hidden"
+          marginBottom: 16,
+          boxShadow: "inset 0 0 20px rgba(0,0,0,0.6)",
+          transition: "border-color 0.3s"
         }}>
-          {/* Alignment Oval Reticle Graphic */}
+          {/* Live Video Element */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: "scaleX(-1)",
+              display: cameraReady ? "block" : "none"
+            }}
+          />
+
+          {!cameraReady && (
+            <div style={{ textAlign: "center", color: "#94a3b8", padding: 20 }}>
+              <RefreshCw size={28} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px" }} />
+              <div style={{ fontSize: 13 }}>{cameraError || "Activating laptop camera…"}</div>
+            </div>
+          )}
+
+          {/* Biometric Oval Alignment Reticle Overlay */}
           <div style={{
-            width: 100,
-            height: 130,
-            borderRadius: "50%",
-            border: "2px dashed #22c55e",
-            boxShadow: "0 0 20px rgba(34, 197, 94, 0.3), inset 0 0 15px rgba(34, 197, 94, 0.2)",
+            position: "absolute",
+            inset: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            position: "relative"
+            pointerEvents: "none"
           }}>
-            <Scan size={38} color="#4ade80" />
-            {/* Corner ticks */}
-            <div style={{ position: "absolute", top: -4, left: 45, width: 10, height: 2, background: "#fff" }} />
-            <div style={{ position: "absolute", bottom: -4, left: 45, width: 10, height: 2, background: "#fff" }} />
-            <div style={{ position: "absolute", left: -4, top: 60, width: 2, height: 10, background: "#fff" }} />
-            <div style={{ position: "absolute", right: -4, top: 60, width: 2, height: 10, background: "#fff" }} />
-          </div>
-          <div style={{ position: "absolute", bottom: 10, fontSize: 12, fontWeight: 600, color: "#4ade80", letterSpacing: "0.03em" }}>
-            ● LOOK AT LAPTOP WEBCAM
+            {/* The Alignment Oval */}
+            <div style={{
+              width: 140,
+              height: 190,
+              borderRadius: "50%",
+              border: `3px dashed ${isAligned ? "#22c55e" : "#ef4444"}`,
+              boxShadow: isAligned
+                ? "0 0 25px rgba(34, 197, 94, 0.7), inset 0 0 20px rgba(34, 197, 94, 0.3)"
+                : "0 0 25px rgba(239, 68, 68, 0.7), inset 0 0 20px rgba(239, 68, 68, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              transition: "all 0.25s ease"
+            }}>
+              {/* Center Crosshair Tick Marks */}
+              <div style={{ position: "absolute", top: -5, left: 65, width: 10, height: 3, background: "#fff", borderRadius: 2 }} />
+              <div style={{ position: "absolute", bottom: -5, left: 65, width: 10, height: 3, background: "#fff", borderRadius: 2 }} />
+              <div style={{ position: "absolute", left: -5, top: 90, width: 3, height: 10, background: "#fff", borderRadius: 2 }} />
+              <div style={{ position: "absolute", right: -5, top: 90, width: 3, height: 10, background: "#fff", borderRadius: 2 }} />
+            </div>
+
+            {/* Dynamic Status Pill */}
+            <div style={{
+              position: "absolute",
+              bottom: 12,
+              background: isAligned ? "rgba(20, 83, 45, 0.9)" : "rgba(69, 10, 10, 0.9)",
+              border: `1px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
+              color: isAligned ? "#4ade80" : "#fca5a5",
+              borderRadius: 99,
+              padding: "4px 14px",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.03em",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              transition: "all 0.25s ease"
+            }}>
+              {alignmentMsg}
+            </div>
           </div>
         </div>
 
         {/* Student Target Card */}
-        <div style={{ background: "#1e293b", borderRadius: 12, padding: "12px 16px", marginBottom: 18, border: "1px solid #334155" }}>
-          <div style={{ fontSize: 11, textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.05em", marginBottom: 4 }}>
-            Registering Student
+        <div style={{ background: "#1e293b", borderRadius: 12, padding: "10px 16px", marginBottom: 14, border: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 11, textTransform: "uppercase", color: "#64748b", fontWeight: 700 }}>Student</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{student.firstName} {student.lastName}</div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>
-              {student.firstName} {student.lastName}
-            </span>
-            <code style={{ background: "#0f172a", color: "#38bdf8", padding: "3px 8px", borderRadius: 6, fontSize: 13, fontWeight: 600 }}>
-              {student.rollNumber}
-            </code>
-          </div>
-        </div>
-
-        {/* Alignment Instructions */}
-        <div style={{ background: "#0c4a6e", border: "1px solid #0284c7", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#e0f2fe", lineHeight: 1.6, marginBottom: 18 }}>
-          <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-            <ShieldCheck size={16} color="#38bdf8" />
-            Face Alignment Verification Instructions:
-          </div>
-          <div>1. The <strong>"Class AI Biometrics"</strong> window has opened on your laptop.</div>
-          <div>2. Position your face inside the <strong>oval guide</strong>.</div>
-          <div>3. When your face is aligned and sharp, the oval turns <strong style={{ color: "#4ade80" }}>GREEN</strong>.</div>
-          <div>4. <strong>Hold still for 3 seconds</strong> while 20 biometric angles are captured.</div>
+          <code style={{ background: "#0f172a", color: "#38bdf8", padding: "4px 10px", borderRadius: 6, fontSize: 13, fontWeight: 700 }}>
+            {student.rollNumber}
+          </code>
         </div>
 
         {/* Footer info & Dismiss */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#64748b" }}>
-          <span>Agent: laptop-agent-01 (Active)</span>
+          <span>
+            {isAligned ? "🟢 Ready: Capturing & encoding biometric frames" : "🔴 Align your face to proceed"}
+          </span>
           <button
             onClick={onClose}
             style={{
