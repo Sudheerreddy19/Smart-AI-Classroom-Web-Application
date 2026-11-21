@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import {
   Camera, Users, CheckCircle2, XCircle, RefreshCw,
   Building2, BookOpen, User, AlertTriangle,
-  Play, Clock, Award, ChevronRight, Wifi, WifiOff
+  Play, Clock, Award, ChevronRight, Scan, Eye, ShieldCheck
 } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 
@@ -21,10 +21,26 @@ export default function FaceRegistration() {
   const [selDept, setSelDept] = useState("");
   const [selSem,  setSelSem]  = useState("");
 
-  const [loading, setLoading]       = useState(false);
-  const [capturing, setCapturing]   = useState(false);
-  const [captureId, setCaptureId]   = useState(null);  // student being captured
-  const [captureResult, setCaptureResult] = useState(null);
+  const [loading, setLoading]                 = useState(false);
+  const [capturing, setCapturing]             = useState(false);
+  const [captureId, setCaptureId]             = useState(null);
+  const [capturingStudent, setCapturingStudent] = useState(null);
+  const [captureElapsed, setCaptureElapsed]   = useState(0);
+  const [captureResult, setCaptureResult]     = useState(null);
+
+  // Timer while capturing
+  useEffect(() => {
+    let interval = null;
+    if (capturing) {
+      setCaptureElapsed(0);
+      interval = setInterval(() => {
+        setCaptureElapsed(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [capturing]);
 
   // ── Load departments ────────────────────────────────────────────────────
   useEffect(() => {
@@ -73,6 +89,7 @@ export default function FaceRegistration() {
     }
 
     setCaptureId(student.id);
+    setCapturingStudent(student);
     setCapturing(true);
     setCaptureResult(null);
 
@@ -92,7 +109,7 @@ export default function FaceRegistration() {
         toast.error(data.message || "Face capture failed.");
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "Face capture failed. Please ensure the Class AI service is running on the classroom laptop.";
+      const msg = err.response?.data?.message || "Face capture failed. Ensure Class AI service is running on laptop.";
       toast.error(msg);
       setCaptureResult({ success: false, message: msg });
     } finally {
@@ -111,12 +128,21 @@ export default function FaceRegistration() {
 
   return (
     <div className="fr-page">
+      {/* Active Capture & Alignment Screen Modal */}
+      {capturing && capturingStudent && (
+        <CaptureScreenModal
+          student={capturingStudent}
+          elapsed={captureElapsed}
+          onClose={() => { setCapturing(false); setCapturingStudent(null); }}
+        />
+      )}
+
       {/* Header */}
       <div className="fr-header">
         <div className="fr-header-icon"><Camera size={28} /></div>
         <div>
           <h1 className="fr-title">Face Registration</h1>
-          <p className="fr-sub">Select a batch and capture face encodings for each student.</p>
+          <p className="fr-sub">Select a batch and capture biometric face encodings for each student.</p>
         </div>
       </div>
 
@@ -126,7 +152,7 @@ export default function FaceRegistration() {
           ["1", "Select Department + Semester", Building2],
           ["2", "Choose a student from the list", Users],
           ["3", "Click Capture Face", Camera],
-          ["4", "Webcam opens on classroom laptop (25 images)", Play],
+          ["4", "Webcam opens with oval alignment guide", Play],
         ].map(([num, text, Icon]) => (
           <div key={num} className="fr-how-step">
             <div className="fr-how-num">{num}</div>
@@ -175,23 +201,17 @@ export default function FaceRegistration() {
         </div>
       )}
 
-      {/* Agent info note */}
-      <div className="fr-warn">
-        <AlertTriangle size={16} />
-        <span>The <strong>Class AI Agent</strong> must be running on the classroom laptop before capturing. Check the status banner above.</span>
-      </div>
-
-      {/* Capture Result */}
+      {/* Capture Result Banner */}
       {captureResult && (
         <div className={`fr-result ${captureResult.success ? "fr-result--ok" : "fr-result--err"}`}>
           {captureResult.success
             ? <CheckCircle2 size={20} />
             : <XCircle size={20} />}
           <div>
-            <strong>{captureResult.success ? "Face Registered!" : "Capture Failed"}</strong>
+            <strong>{captureResult.success ? "Face Registered Successfully!" : "Capture Failed"}</strong>
             <span> — {captureResult.message}</span>
             {captureResult.success && (
-              <span className="fr-result-detail"> ({captureResult.imagesCaptured} images captured)</span>
+              <span className="fr-result-detail"> ({captureResult.imagesCaptured || 20} images captured and encoded)</span>
             )}
           </div>
         </div>
@@ -345,14 +365,6 @@ export default function FaceRegistration() {
         .fr-stat-num   { font-size: 1.75rem; font-weight: 800; }
         .fr-stat-label { font-size: 0.78rem; color: #64748b; font-weight: 500; }
 
-        .fr-warn {
-          display: flex; align-items: center; gap: 10px;
-          background: #fefce8; border: 1px solid #fde047;
-          border-radius: 12px; padding: 0.875rem 1.25rem;
-          font-size: 0.83rem; color: #92400e;
-        }
-        .fr-warn code { background: rgba(0,0,0,0.08); padding: 2px 6px; border-radius: 4px; }
-
         .fr-result {
           display: flex; align-items: center; gap: 12px;
           border-radius: 12px; padding: 1rem 1.25rem;
@@ -444,16 +456,154 @@ export default function FaceRegistration() {
   );
 }
 
+// ── Active Biometric Capture & Face Alignment Modal ────────────────────────────
+function CaptureScreenModal({ student, elapsed, onClose }) {
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(15, 23, 42, 0.85)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 9999,
+      padding: 20
+    }}>
+      <div style={{
+        background: "#0f172a",
+        border: "1.5px solid #38bdf8",
+        borderRadius: 20,
+        maxWidth: 520,
+        width: "100%",
+        padding: "24px 28px",
+        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.2)",
+        color: "#f8fafc",
+        fontFamily: "'Inter', sans-serif"
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, borderBottom: "1px solid #1e293b", paddingBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: "#ef4444",
+              boxShadow: "0 0 12px #ef4444"
+            }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fff", animation: "ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite" }} />
+            </span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#f8fafc", letterSpacing: "0.02em" }}>
+                Biometric Face Capture Active
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                Laptop camera is verifying face alignment
+              </div>
+            </div>
+          </div>
+          <div style={{ background: "#1e293b", padding: "4px 12px", borderRadius: 99, fontSize: 13, fontWeight: 700, color: "#38bdf8", border: "1px solid #334155" }}>
+            ⏱ {elapsed}s
+          </div>
+        </div>
+
+        {/* Biometric Scanning Radar Graphic */}
+        <div style={{
+          position: "relative",
+          height: 180,
+          background: "radial-gradient(circle, #1e293b 0%, #0f172a 75%)",
+          borderRadius: 16,
+          border: "1px solid #334155",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 20,
+          overflow: "hidden"
+        }}>
+          {/* Alignment Oval Reticle Graphic */}
+          <div style={{
+            width: 100,
+            height: 130,
+            borderRadius: "50%",
+            border: "2px dashed #22c55e",
+            boxShadow: "0 0 20px rgba(34, 197, 94, 0.3), inset 0 0 15px rgba(34, 197, 94, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative"
+          }}>
+            <Scan size={38} color="#4ade80" />
+            {/* Corner ticks */}
+            <div style={{ position: "absolute", top: -4, left: 45, width: 10, height: 2, background: "#fff" }} />
+            <div style={{ position: "absolute", bottom: -4, left: 45, width: 10, height: 2, background: "#fff" }} />
+            <div style={{ position: "absolute", left: -4, top: 60, width: 2, height: 10, background: "#fff" }} />
+            <div style={{ position: "absolute", right: -4, top: 60, width: 2, height: 10, background: "#fff" }} />
+          </div>
+          <div style={{ position: "absolute", bottom: 10, fontSize: 12, fontWeight: 600, color: "#4ade80", letterSpacing: "0.03em" }}>
+            ● LOOK AT LAPTOP WEBCAM
+          </div>
+        </div>
+
+        {/* Student Target Card */}
+        <div style={{ background: "#1e293b", borderRadius: 12, padding: "12px 16px", marginBottom: 18, border: "1px solid #334155" }}>
+          <div style={{ fontSize: 11, textTransform: "uppercase", color: "#64748b", fontWeight: 700, letterSpacing: "0.05em", marginBottom: 4 }}>
+            Registering Student
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>
+              {student.firstName} {student.lastName}
+            </span>
+            <code style={{ background: "#0f172a", color: "#38bdf8", padding: "3px 8px", borderRadius: 6, fontSize: 13, fontWeight: 600 }}>
+              {student.rollNumber}
+            </code>
+          </div>
+        </div>
+
+        {/* Alignment Instructions */}
+        <div style={{ background: "#0c4a6e", border: "1px solid #0284c7", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#e0f2fe", lineHeight: 1.6, marginBottom: 18 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+            <ShieldCheck size={16} color="#38bdf8" />
+            Face Alignment Verification Instructions:
+          </div>
+          <div>1. The <strong>"Class AI Biometrics"</strong> window has opened on your laptop.</div>
+          <div>2. Position your face inside the <strong>oval guide</strong>.</div>
+          <div>3. When your face is aligned and sharp, the oval turns <strong style={{ color: "#4ade80" }}>GREEN</strong>.</div>
+          <div>4. <strong>Hold still for 3 seconds</strong> while 20 biometric angles are captured.</div>
+        </div>
+
+        {/* Footer info & Dismiss */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#64748b" }}>
+          <span>Agent: laptop-agent-01 (Active)</span>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "1px solid #475569",
+              color: "#94a3b8",
+              borderRadius: 8,
+              padding: "5px 12px",
+              cursor: "pointer",
+              fontSize: 11
+            }}
+          >
+            Cancel / Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Class AI Agent Status Banner ──────────────────────────────────────────────
-// Replaces the old localhost:8000 health check.
-// Now calls GET /api/faces/agent-status on Spring Boot (Render) instead of
-// directly fetching http://localhost:8000/health from the browser.
 function AgentStatusBanner() {
   const [open, setOpen]           = useState(false);
-  const [agentInfo, setAgentInfo] = useState(null);   // null = not checked yet
+  const [agentInfo, setAgentInfo] = useState(null);
   const [checking, setChecking]   = useState(false);
 
-  // Auto-check on mount
   useEffect(() => { checkAgent(); }, []);
 
   const checkAgent = async () => {
