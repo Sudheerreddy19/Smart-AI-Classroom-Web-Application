@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import {
   Camera, Users, CheckCircle2, XCircle, RefreshCw,
   Building2, BookOpen, User, AlertTriangle,
-  Play, Clock, Award, ChevronRight, Scan, Eye, ShieldCheck
+  Play, Clock, Award, ChevronRight, Scan, Eye, ShieldCheck, Check
 } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 
@@ -22,25 +22,9 @@ export default function FaceRegistration() {
   const [selSem,  setSelSem]  = useState("");
 
   const [loading, setLoading]                 = useState(false);
-  const [capturing, setCapturing]             = useState(false);
-  const [captureId, setCaptureId]             = useState(null);
-  const [capturingStudent, setCapturingStudent] = useState(null);
-  const [captureElapsed, setCaptureElapsed]   = useState(0);
+  const [activeStudent, setActiveStudent]     = useState(null);
+  const [modalOpen, setModalOpen]             = useState(false);
   const [captureResult, setCaptureResult]     = useState(null);
-
-  // Timer while capturing
-  useEffect(() => {
-    let interval = null;
-    if (capturing) {
-      setCaptureElapsed(0);
-      interval = setInterval(() => {
-        setCaptureElapsed(prev => prev + 1);
-      }, 1000);
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [capturing]);
 
   // ── Load departments ────────────────────────────────────────────────────
   useEffect(() => {
@@ -75,8 +59,8 @@ export default function FaceRegistration() {
       .finally(() => setLoading(false));
   }, [selDept, selSem]);
 
-  // ── Trigger face capture ───────────────────────────────────────────────
-  const handleCaptureFace = async (student) => {
+  // ── Open Alignment Modal ───────────────────────────────────────────────
+  const handleOpenCapture = (student) => {
     if (student.registrationStatus === "NOT_REGISTERED") {
       toast.error("Student must create their account first before face registration.");
       return;
@@ -88,34 +72,18 @@ export default function FaceRegistration() {
       if (!reCapture) return;
     }
 
-    setCaptureId(student.id);
-    setCapturingStudent(student);
-    setCapturing(true);
+    setActiveStudent(student);
     setCaptureResult(null);
+    setModalOpen(true);
+  };
 
-    try {
-      const { data } = await axiosClient.post(`/faces/register/${student.id}`);
-      setCaptureResult({ ...data, studentName: `${student.firstName} ${student.lastName}` });
-
-      if (data.success) {
-        toast.success(`Face registered for ${student.firstName}!`);
-        // Update student in list
-        setStudents(prev => prev.map(s =>
-          s.id === student.id
-            ? { ...s, registrationStatus: "FACE_REGISTERED" }
-            : s
-        ));
-      } else {
-        toast.error(data.message || "Face capture failed.");
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || "Face capture failed. Ensure Class AI service is running on laptop.";
-      toast.error(msg);
-      setCaptureResult({ success: false, message: msg });
-    } finally {
-      setCapturing(false);
-      setCaptureId(null);
-    }
+  const handleCaptureSuccess = (studentId, data) => {
+    setStudents(prev => prev.map(s =>
+      s.id === studentId
+        ? { ...s, registrationStatus: "FACE_REGISTERED" }
+        : s
+    ));
+    setCaptureResult({ ...data, studentName: `${activeStudent.firstName} ${activeStudent.lastName}` });
   };
 
   // Stats
@@ -128,12 +96,12 @@ export default function FaceRegistration() {
 
   return (
     <div className="fr-page">
-      {/* Active Capture & Alignment Screen Modal */}
-      {capturing && capturingStudent && (
+      {/* Live Biometric Camera & Face Alignment Modal */}
+      {modalOpen && activeStudent && (
         <CaptureScreenModal
-          student={capturingStudent}
-          elapsed={captureElapsed}
-          onClose={() => { setCapturing(false); setCapturingStudent(null); }}
+          student={activeStudent}
+          onSuccess={(data) => handleCaptureSuccess(activeStudent.id, data)}
+          onClose={() => { setModalOpen(false); setActiveStudent(null); }}
         />
       )}
 
@@ -152,7 +120,7 @@ export default function FaceRegistration() {
           ["1", "Select Department + Semester", Building2],
           ["2", "Choose a student from the list", Users],
           ["3", "Click Capture Face", Camera],
-          ["4", "Webcam opens with oval alignment guide", Play],
+          ["4", "Align face in the live green guide", Play],
         ].map(([num, text, Icon]) => (
           <div key={num} className="fr-how-step">
             <div className="fr-how-num">{num}</div>
@@ -246,11 +214,10 @@ export default function FaceRegistration() {
             <tbody>
               {students.map((s, i) => {
                 const statusCfg = STATUS_COLORS[s.registrationStatus] || STATUS_COLORS.NOT_REGISTERED;
-                const isCapturing = capturing && captureId === s.id;
                 const canCapture  = s.registrationStatus !== "NOT_REGISTERED";
 
                 return (
-                  <tr key={s.id} className={isCapturing ? "fr-row--capturing" : ""}>
+                  <tr key={s.id}>
                     <td className="fr-td-num">{i + 1}</td>
                     <td>
                       <div className="fr-student-cell">
@@ -275,12 +242,9 @@ export default function FaceRegistration() {
                       {canCapture ? (
                         <button
                           className={`fr-capture-btn ${s.registrationStatus === "FACE_REGISTERED" ? "fr-capture-btn--re" : "fr-capture-btn--new"}`}
-                          onClick={() => handleCaptureFace(s)}
-                          disabled={capturing}
+                          onClick={() => handleOpenCapture(s)}
                         >
-                          {isCapturing
-                            ? <><RefreshCw size={14} className="fr-spin" /> Capturing…</>
-                            : <><Camera size={14} /> {s.registrationStatus === "FACE_REGISTERED" ? "Re-Capture" : "Capture Face"}</>}
+                          <Camera size={14} /> {s.registrationStatus === "FACE_REGISTERED" ? "Re-Capture" : "Capture Face"}
                         </button>
                       ) : (
                         <span className="fr-no-acct">Account not created</span>
@@ -405,7 +369,6 @@ export default function FaceRegistration() {
         }
         .fr-table tbody tr:hover { background: #f8fafc; }
         .fr-table tbody tr:last-child { border-bottom: none; }
-        .fr-row--capturing { background: #eff6ff !important; }
         .fr-table td { padding: 12px 16px; vertical-align: middle; }
         .fr-td-num { color: #94a3b8; font-size: 0.83rem; font-weight: 500; }
 
@@ -456,16 +419,21 @@ export default function FaceRegistration() {
   );
 }
 
-// ── Active Biometric Capture & Face Alignment Modal ────────────────────────────
-function CaptureScreenModal({ student, elapsed, onClose }) {
+// ── Live Biometric Camera & Face Alignment Modal ──────────────────────────────
+function CaptureScreenModal({ student, onSuccess, onClose }) {
   const videoRef      = useRef(null);
   const streamRef     = useRef(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState(null);
   const [isAligned,   setIsAligned]   = useState(false);
   const [alignmentMsg, setAlignmentMsg] = useState("Position face inside the oval");
+  
+  // Stages: "aligning" | "capturing" | "success" | "error"
+  const [stage, setStage]             = useState("aligning");
+  const [statusMsg, setStatusMsg]     = useState("");
+  const [elapsed, setElapsed]         = useState(0);
 
-  // Activate browser webcam
+  // Activate browser webcam for alignment
   useEffect(() => {
     let active = true;
     let stream = null;
@@ -494,11 +462,13 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
         }
       } catch (err) {
         console.warn("Browser camera access error:", err);
-        setCameraError("Camera permission needed. Please allow webcam access.");
+        setCameraError("Camera permission needed. Please allow webcam access in your browser.");
       }
     }
 
-    initCamera();
+    if (stage === "aligning") {
+      initCamera();
+    }
 
     // Alignment verification loop
     const canvas = document.createElement("canvas");
@@ -507,6 +477,7 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
     const interval = setInterval(async () => {
+      if (stage !== "aligning") return;
       if (!videoRef.current || videoRef.current.readyState < 2) return;
       const v = videoRef.current;
 
@@ -619,7 +590,56 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
     };
-  }, []);
+  }, [stage]);
+
+  // Elapsed timer during capturing
+  useEffect(() => {
+    let t = null;
+    if (stage === "capturing") {
+      setElapsed(0);
+      t = setInterval(() => setElapsed(e => e + 1), 1000);
+    } else {
+      clearInterval(t);
+    }
+    return () => clearInterval(t);
+  }, [stage]);
+
+  // ── START BIOMETRIC CAPTURE (Release browser cam -> Call Python AI Agent) ───
+  const startBiometricCapture = async () => {
+    // 1. CRITICAL: Stop browser camera tracks immediately so hardware webcam is 100% free for Python!
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setStage("capturing");
+    setStatusMsg("Class AI Agent is capturing 20 biometric angles... Please hold still.");
+
+    try {
+      // 2. Call backend -> dispatches CAPTURE_JOB to Python Agent via WebSocket
+      const { data } = await axiosClient.post(`/faces/register/${student.id}`);
+      
+      if (data.success) {
+        setStage("success");
+        setStatusMsg(`Face registered successfully! ${data.imagesCaptured || 20} angles captured.`);
+        toast.success(`Face registered for ${student.firstName}!`);
+        onSuccess(data);
+        setTimeout(() => {
+          onClose();
+        }, 2200);
+      } else {
+        setStage("error");
+        setStatusMsg(data.message || "Face capture failed. Please retry.");
+      }
+    } catch (err) {
+      setStage("error");
+      const msg = err.response?.data?.message || "Capture failed. Ensure Class AI service is running on laptop.";
+      setStatusMsg(msg);
+    }
+  };
 
   return (
     <div style={{
@@ -635,12 +655,12 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
     }}>
       <div style={{
         background: "#0f172a",
-        border: `2px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
+        border: `2px solid ${stage === "success" ? "#22c55e" : stage === "error" ? "#ef4444" : isAligned ? "#22c55e" : "#ef4444"}`,
         borderRadius: 22,
         maxWidth: 540,
         width: "100%",
         padding: "22px 26px",
-        boxShadow: isAligned
+        boxShadow: isAligned || stage === "success"
           ? "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(34, 197, 94, 0.25)"
           : "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(239, 68, 68, 0.25)",
         color: "#f8fafc",
@@ -657,7 +677,7 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
               width: 32,
               height: 32,
               borderRadius: "50%",
-              background: isAligned ? "#16a34a" : "#dc2626",
+              background: stage === "success" ? "#16a34a" : stage === "capturing" ? "#0284c7" : isAligned ? "#16a34a" : "#dc2626",
               boxShadow: isAligned ? "0 0 12px #22c55e" : "0 0 12px #ef4444",
               transition: "all 0.3s"
             }}>
@@ -665,105 +685,177 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
             </span>
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, color: "#f8fafc" }}>
-                Live Biometric Face Capture
+                {stage === "capturing" ? "Biometric Recording in Progress" : stage === "success" ? "Registration Complete!" : "Live Face Alignment"}
               </div>
-              <div style={{ fontSize: 12, color: isAligned ? "#4ade80" : "#f87171", fontWeight: 600 }}>
-                {isAligned ? "✓ Face Aligned & Clear" : "● Align Face Inside Oval"}
+              <div style={{ fontSize: 12, color: isAligned || stage === "success" ? "#4ade80" : "#f87171", fontWeight: 600 }}>
+                {stage === "capturing" ? "Hold still while AI encodes face…" : stage === "success" ? "Verified & Saved" : isAligned ? "✓ Face Aligned & Clear" : "● Align Face Inside Oval"}
               </div>
             </div>
           </div>
-          <div style={{ background: "#1e293b", padding: "4px 12px", borderRadius: 99, fontSize: 13, fontWeight: 700, color: "#38bdf8", border: "1px solid #334155" }}>
-            ⏱ {elapsed}s
-          </div>
-        </div>
-
-        {/* Real Webcam Viewport with Interactive Alignment Oval */}
-        <div style={{
-          position: "relative",
-          height: 250,
-          background: "#020617",
-          borderRadius: 16,
-          border: `2px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 16,
-          boxShadow: "inset 0 0 20px rgba(0,0,0,0.6)",
-          transition: "border-color 0.3s"
-        }}>
-          {/* Live Video Element */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transform: "scaleX(-1)",
-              display: cameraReady ? "block" : "none"
-            }}
-          />
-
-          {!cameraReady && (
-            <div style={{ textAlign: "center", color: "#94a3b8", padding: 20 }}>
-              <RefreshCw size={28} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px" }} />
-              <div style={{ fontSize: 13 }}>{cameraError || "Activating laptop camera…"}</div>
+          {stage === "capturing" && (
+            <div style={{ background: "#1e293b", padding: "4px 12px", borderRadius: 99, fontSize: 13, fontWeight: 700, color: "#38bdf8", border: "1px solid #334155" }}>
+              ⏱ {elapsed}s
             </div>
           )}
+        </div>
 
-          {/* Biometric Oval Alignment Reticle Overlay */}
+        {/* Real Webcam Viewport (Stage === "aligning") */}
+        {stage === "aligning" && (
           <div style={{
-            position: "absolute",
-            inset: 0,
+            position: "relative",
+            height: 250,
+            background: "#020617",
+            borderRadius: 16,
+            border: `2px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
+            overflow: "hidden",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            pointerEvents: "none"
+            marginBottom: 16,
+            boxShadow: "inset 0 0 20px rgba(0,0,0,0.6)",
+            transition: "border-color 0.3s"
           }}>
-            {/* The Alignment Oval */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                transform: "scaleX(-1)",
+                display: cameraReady ? "block" : "none"
+              }}
+            />
+
+            {!cameraReady && (
+              <div style={{ textAlign: "center", color: "#94a3b8", padding: 20 }}>
+                <RefreshCw size={28} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px" }} />
+                <div style={{ fontSize: 13 }}>{cameraError || "Activating laptop camera…"}</div>
+              </div>
+            )}
+
+            {/* Oval Alignment Reticle Overlay */}
             <div style={{
-              width: 140,
-              height: 190,
-              borderRadius: "50%",
-              border: `3px dashed ${isAligned ? "#22c55e" : "#ef4444"}`,
-              boxShadow: isAligned
-                ? "0 0 25px rgba(34, 197, 94, 0.7), inset 0 0 20px rgba(34, 197, 94, 0.3)"
-                : "0 0 25px rgba(239, 68, 68, 0.7), inset 0 0 20px rgba(239, 68, 68, 0.3)",
+              position: "absolute",
+              inset: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              position: "relative",
-              transition: "all 0.25s ease"
+              pointerEvents: "none"
             }}>
-              {/* Center Crosshair Tick Marks */}
-              <div style={{ position: "absolute", top: -5, left: 65, width: 10, height: 3, background: "#fff", borderRadius: 2 }} />
-              <div style={{ position: "absolute", bottom: -5, left: 65, width: 10, height: 3, background: "#fff", borderRadius: 2 }} />
-              <div style={{ position: "absolute", left: -5, top: 90, width: 3, height: 10, background: "#fff", borderRadius: 2 }} />
-              <div style={{ position: "absolute", right: -5, top: 90, width: 3, height: 10, background: "#fff", borderRadius: 2 }} />
-            </div>
+              <div style={{
+                width: 140,
+                height: 190,
+                borderRadius: "50%",
+                border: `3px dashed ${isAligned ? "#22c55e" : "#ef4444"}`,
+                boxShadow: isAligned
+                  ? "0 0 25px rgba(34, 197, 94, 0.7), inset 0 0 20px rgba(34, 197, 94, 0.3)"
+                  : "0 0 25px rgba(239, 68, 68, 0.7), inset 0 0 20px rgba(239, 68, 68, 0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+                transition: "all 0.25s ease"
+              }}>
+                <div style={{ position: "absolute", top: -5, left: 65, width: 10, height: 3, background: "#fff", borderRadius: 2 }} />
+                <div style={{ position: "absolute", bottom: -5, left: 65, width: 10, height: 3, background: "#fff", borderRadius: 2 }} />
+                <div style={{ position: "absolute", left: -5, top: 90, width: 3, height: 10, background: "#fff", borderRadius: 2 }} />
+                <div style={{ position: "absolute", right: -5, top: 90, width: 3, height: 10, background: "#fff", borderRadius: 2 }} />
+              </div>
 
-            {/* Dynamic Status Pill */}
-            <div style={{
-              position: "absolute",
-              bottom: 12,
-              background: isAligned ? "rgba(20, 83, 45, 0.9)" : "rgba(69, 10, 10, 0.9)",
-              border: `1px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
-              color: isAligned ? "#4ade80" : "#fca5a5",
-              borderRadius: 99,
-              padding: "4px 14px",
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.03em",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-              transition: "all 0.25s ease"
-            }}>
-              {alignmentMsg}
+              <div style={{
+                position: "absolute",
+                bottom: 12,
+                background: isAligned ? "rgba(20, 83, 45, 0.9)" : "rgba(69, 10, 10, 0.9)",
+                border: `1px solid ${isAligned ? "#22c55e" : "#ef4444"}`,
+                color: isAligned ? "#4ade80" : "#fca5a5",
+                borderRadius: 99,
+                padding: "4px 14px",
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.03em",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+                transition: "all 0.25s ease"
+              }}>
+                {alignmentMsg}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Capturing / Success Stage Animation Viewport */}
+        {stage !== "aligning" && (
+          <div style={{
+            position: "relative",
+            height: 250,
+            background: "radial-gradient(circle, #1e293b 0%, #0f172a 80%)",
+            borderRadius: 16,
+            border: `2px solid ${stage === "success" ? "#22c55e" : stage === "error" ? "#ef4444" : "#0284c7"}`,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 16,
+            padding: 20,
+            textAlign: "center"
+          }}>
+            {stage === "capturing" && (
+              <>
+                <div style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: "50%",
+                  border: "3px solid #38bdf8",
+                  borderTopColor: "transparent",
+                  animation: "spin 1s linear infinite",
+                  marginBottom: 16
+                }} />
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 6 }}>
+                  Recording Biometric Encodings…
+                </div>
+                <div style={{ fontSize: 13, color: "#94a3b8", maxWidth: 360 }}>
+                  Camera released to Class AI Agent. Capturing 20 frames from laptop webcam. Hold still!
+                </div>
+              </>
+            )}
+
+            {stage === "success" && (
+              <>
+                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 0 25px rgba(34, 197, 94, 0.6)" }}>
+                  <Check size={40} color="#fff" />
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#4ade80", marginBottom: 6 }}>
+                  Face Enrolled Successfully!
+                </div>
+                <div style={{ fontSize: 13, color: "#cbd5e1" }}>
+                  {statusMsg}
+                </div>
+              </>
+            )}
+
+            {stage === "error" && (
+              <>
+                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 0 25px rgba(239, 68, 68, 0.6)" }}>
+                  <XCircle size={40} color="#fff" />
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#f87171", marginBottom: 6 }}>
+                  Capture Failed
+                </div>
+                <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>
+                  {statusMsg}
+                </div>
+                <button
+                  onClick={() => setStage("aligning")}
+                  style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                >
+                  Try Again
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Student Target Card */}
         <div style={{ background: "#1e293b", borderRadius: 12, padding: "10px 16px", marginBottom: 14, border: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -776,21 +868,56 @@ function CaptureScreenModal({ student, elapsed, onClose }) {
           </code>
         </div>
 
+        {/* Dynamic Action Button in Aligning Stage */}
+        {stage === "aligning" && (
+          <button
+            onClick={startBiometricCapture}
+            disabled={!isAligned}
+            style={{
+              width: "100%",
+              padding: "12px",
+              borderRadius: 12,
+              border: "none",
+              background: isAligned
+                ? "linear-gradient(135deg, #16a34a, #22c55e)"
+                : "#334155",
+              color: isAligned ? "#fff" : "#94a3b8",
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: isAligned ? "pointer" : "not-allowed",
+              boxShadow: isAligned ? "0 4px 16px rgba(34, 197, 94, 0.4)" : "none",
+              marginBottom: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              transition: "all 0.2s"
+            }}
+          >
+            <Camera size={18} />
+            {isAligned ? "📸 CAPTURE BIOMETRIC DATA NOW" : "Align face in green to enable capture"}
+          </button>
+        )}
+
         {/* Footer info & Dismiss */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#64748b" }}>
           <span>
-            {isAligned ? "🟢 Ready: Capturing & encoding biometric frames" : "🔴 Align your face to proceed"}
+            {stage === "aligning"
+              ? (isAligned ? "🟢 Ready to capture" : "🔴 Align inside oval guide")
+              : "Agent: laptop-agent-01 (Active)"}
           </span>
           <button
             onClick={onClose}
+            disabled={stage === "capturing"}
             style={{
               background: "transparent",
               border: "1px solid #475569",
               color: "#94a3b8",
               borderRadius: 8,
               padding: "5px 12px",
-              cursor: "pointer",
-              fontSize: 11
+              cursor: stage === "capturing" ? "not-allowed" : "pointer",
+              fontSize: 11,
+              opacity: stage === "capturing" ? 0.5 : 1
             }}
           >
             Cancel / Close
