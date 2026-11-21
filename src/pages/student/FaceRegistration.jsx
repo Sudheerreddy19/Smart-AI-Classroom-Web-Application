@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import {
   Camera, Users, CheckCircle2, XCircle, RefreshCw,
   Building2, BookOpen, User, AlertTriangle,
-  Play, Clock, Award, ChevronRight
+  Play, Clock, Award, ChevronRight, Wifi, WifiOff
 } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 
@@ -26,14 +26,14 @@ export default function FaceRegistration() {
   const [captureId, setCaptureId]   = useState(null);  // student being captured
   const [captureResult, setCaptureResult] = useState(null);
 
-  // ── Load departments ────────────────────────────────────────
+  // ── Load departments ────────────────────────────────────────────────────
   useEffect(() => {
     axiosClient.get("/departments").then(({ data }) => {
       setDepartments(Array.isArray(data) ? data : data.content ?? []);
     }).catch(() => toast.error("Failed to load departments."));
   }, []);
 
-  // ── Load semesters when dept changes ─────────────────────
+  // ── Load semesters when dept changes ───────────────────────────────────
   useEffect(() => {
     if (!selDept) { setSemesters([]); setSelSem(""); return; }
     axiosClient.get(`/semesters/department/${selDept}`)
@@ -46,7 +46,7 @@ export default function FaceRegistration() {
       .catch(() => toast.error("Failed to load semesters."));
   }, [selDept]);
 
-  // ── Load students when dept + sem selected ───────────────
+  // ── Load students when dept + sem selected ─────────────────────────────
   useEffect(() => {
     if (!selDept || !selSem) { setStudents([]); return; }
     setLoading(true);
@@ -59,7 +59,7 @@ export default function FaceRegistration() {
       .finally(() => setLoading(false));
   }, [selDept, selSem]);
 
-  // ── Trigger face capture ──────────────────────────────────
+  // ── Trigger face capture ───────────────────────────────────────────────
   const handleCaptureFace = async (student) => {
     if (student.registrationStatus === "NOT_REGISTERED") {
       toast.error("Student must create their account first before face registration.");
@@ -92,7 +92,7 @@ export default function FaceRegistration() {
         toast.error(data.message || "Face capture failed.");
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "Face capture service error. Is the Python service running?";
+      const msg = err.response?.data?.message || "Face capture failed. Please ensure the Class AI service is running on the classroom laptop.";
       toast.error(msg);
       setCaptureResult({ success: false, message: msg });
     } finally {
@@ -126,7 +126,7 @@ export default function FaceRegistration() {
           ["1", "Select Department + Semester", Building2],
           ["2", "Choose a student from the list", Users],
           ["3", "Click Capture Face", Camera],
-          ["4", "Webcam opens automatically (25 images)", Play],
+          ["4", "Webcam opens on classroom laptop (25 images)", Play],
         ].map(([num, text, Icon]) => (
           <div key={num} className="fr-how-step">
             <div className="fr-how-num">{num}</div>
@@ -135,8 +135,9 @@ export default function FaceRegistration() {
           </div>
         ))}
       </div>
-      {/* Python Service Setup Banner */}
-      <PythonSetupBanner />
+
+      {/* Class AI Agent Status Banner */}
+      <AgentStatusBanner />
 
       {/* Filters */}
       <div className="fr-filters">
@@ -174,10 +175,10 @@ export default function FaceRegistration() {
         </div>
       )}
 
-      {/* Python service warning */}
+      {/* Agent info note */}
       <div className="fr-warn">
         <AlertTriangle size={16} />
-        <span>The Python face service must be running on <strong>localhost:8000</strong> before capturing. See <code>ai-face-service/README.md</code>.</span>
+        <span>The <strong>Class AI Agent</strong> must be running on the classroom laptop before capturing. Check the status banner above.</span>
       </div>
 
       {/* Capture Result */}
@@ -443,61 +444,91 @@ export default function FaceRegistration() {
   );
 }
 
-// ── Python Service Setup Banner ───────────────────────────────────────────────
-function PythonSetupBanner() {
-  const [open, setOpen] = useState(false);
-  const [serviceUp, setServiceUp] = useState(null);
+// ── Class AI Agent Status Banner ──────────────────────────────────────────────
+// Replaces the old localhost:8000 health check.
+// Now calls GET /api/faces/agent-status on Spring Boot (Render) instead of
+// directly fetching http://localhost:8000/health from the browser.
+function AgentStatusBanner() {
+  const [open, setOpen]           = useState(false);
+  const [agentInfo, setAgentInfo] = useState(null);   // null = not checked yet
+  const [checking, setChecking]   = useState(false);
 
-  const checkService = async () => {
+  // Auto-check on mount
+  useEffect(() => { checkAgent(); }, []);
+
+  const checkAgent = async () => {
+    setChecking(true);
     try {
-      const r = await fetch("http://localhost:8000/health", { signal: AbortSignal.timeout(3000) });
-      setServiceUp(r.ok);
+      const { data } = await axiosClient.get("/faces/agent-status");
+      setAgentInfo(data);
     } catch {
-      setServiceUp(false);
+      setAgentInfo({ connected: false, agentId: null, lastHeartbeat: null });
+    } finally {
+      setChecking(false);
     }
   };
 
-  const borderColor = serviceUp === true ? "#16a34a" : serviceUp === false ? "#dc2626" : "#6366f1";
-  const bgColor     = serviceUp === true ? "#052e16" : serviceUp === false ? "#450a0a" : "#1e1b4b";
+  const connected = agentInfo?.connected === true;
+  const borderColor = checking        ? "#6366f1"
+                    : connected       ? "#16a34a"
+                    : agentInfo       ? "#dc2626"
+                    : "#6366f1";
+  const bgColor     = checking        ? "#1e1b4b"
+                    : connected       ? "#052e16"
+                    : agentInfo       ? "#450a0a"
+                    : "#1e1b4b";
 
   return (
     <div style={{ background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>🐍</span>
+          <span style={{ fontSize: 20 }}>🤖</span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#e2e8f0" }}>
-              Python AI Face Service
-              {serviceUp === true  && <span style={{ marginLeft: 8, color: "#4ade80", fontSize: 12 }}>● Running</span>}
-              {serviceUp === false && <span style={{ marginLeft: 8, color: "#f87171", fontSize: 12 }}>● Not Running</span>}
+              Class AI Agent
+              {checking && <span style={{ marginLeft: 8, color: "#a5b4fc", fontSize: 12 }}>● Checking…</span>}
+              {!checking && connected  && <span style={{ marginLeft: 8, color: "#4ade80", fontSize: 12 }}>● Connected</span>}
+              {!checking && agentInfo && !connected && <span style={{ marginLeft: 8, color: "#f87171", fontSize: 12 }}>● Offline</span>}
             </div>
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>
-              Must be running on <code style={{ color: "#a5b4fc" }}>http://localhost:8000</code> before clicking Capture Face
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+              {connected
+                ? <>Classroom laptop agent is online{agentInfo?.agentId ? ` (${agentInfo.agentId})` : ""}. Ready to capture.</>
+                : agentInfo
+                  ? <>Classroom laptop is offline. Start the <strong style={{ color: "#e2e8f0" }}>Class AI service</strong> on the laptop.</>
+                  : <>Click <strong style={{ color: "#e2e8f0" }}>Check Status</strong> to verify agent connection.</>
+              }
             </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={checkService} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "6px 14px", color: "#94a3b8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-            Check Status
+          <button
+            onClick={checkAgent}
+            disabled={checking}
+            style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "6px 14px", color: "#94a3b8", cursor: checking ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            {checking ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Checking…</> : "Check Status"}
           </button>
           <button onClick={() => setOpen(o => !o)} style={{ background: "#6366f1", border: "none", borderRadius: 8, padding: "6px 14px", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-            {open ? "Hide Setup" : "▶ How to Start"}
+            {open ? "Hide Info" : "▶ How to Start"}
           </button>
         </div>
       </div>
 
+      {!connected && agentInfo && (
+        <div style={{ marginTop: 10, padding: "10px 14px", background: "#450a0a", borderRadius: 8, border: "1px solid #7f1d1d", fontSize: 12, color: "#fca5a5" }}>
+          ⚠️ The classroom laptop agent is not connected. Face capture will fail until the agent is running and connected.
+        </div>
+      )}
+
       {open && (
         <div style={{ marginTop: 16, borderTop: "1px solid #334155", paddingTop: 16 }}>
           <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>
-            Open <strong style={{ color: "#e2e8f0" }}>PowerShell</strong> (search in Start menu) and run these commands one by one:
+            Open <strong style={{ color: "#e2e8f0" }}>PowerShell</strong> on the <strong style={{ color: "#e2e8f0" }}>classroom laptop</strong> and run:
           </p>
           {[
-            { step: "1", title: "Navigate to the AI service folder",             cmd: "cd C:\\Users\\SUDHEER\\Downloads\\AiClass\\ai-face-service" },
-            { step: "2", title: "Create virtual environment (first time only)",  cmd: "python -m venv venv" },
-            { step: "3", title: "Activate virtual environment",                  cmd: "venv\\Scripts\\activate" },
-            { step: "4", title: "Install dependencies (first time only — ~2 min)", cmd: "pip install fastapi uvicorn opencv-python numpy" },
-            { step: "5", title: "Install face-recognition (first time — ~5 min)", cmd: "pip install cmake dlib face-recognition" },
-            { step: "6", title: "🚀 Start the AI service",                        cmd: "uvicorn main:app --host 0.0.0.0 --port 8000 --reload" },
+            { step: "1", title: "Navigate to the AI service folder",    cmd: "cd C:\\Users\\SUDHEER\\OneDrive\\Documents\\python-face-service" },
+            { step: "2", title: "Activate virtual environment",         cmd: ".venv311\\Scripts\\activate" },
+            { step: "3", title: "🚀 Start the Class AI service",        cmd: "python run_classai.py" },
           ].map(({ step, title, cmd }) => (
             <div key={step} style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
@@ -510,9 +541,9 @@ function PythonSetupBanner() {
             </div>
           ))}
           <div style={{ background: "#172554", borderRadius: 8, padding: "12px 14px", marginTop: 12, fontSize: 12, color: "#93c5fd", lineHeight: 1.7 }}>
-            <strong>✅ Success message:</strong> <code>Uvicorn running on http://0.0.0.0:8000</code>
-            <br />After seeing this, click <strong>Check Status</strong> above — it should show <span style={{ color: "#4ade80" }}>● Running</span>.
-            <br /><strong>⚠️ Keep this PowerShell window open</strong> while using Face Registration.
+            <strong>✅ Success:</strong> The service starts, connects to the server, and shows <code>✅ Authenticated</code> in the logs.<br />
+            After that, click <strong>Check Status</strong> above — it should show <span style={{ color: "#4ade80" }}>● Connected</span>.<br />
+            <strong>⚠️ Keep this PowerShell window open</strong> while using Face Registration.
           </div>
         </div>
       )}
