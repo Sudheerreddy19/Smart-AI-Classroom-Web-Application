@@ -906,22 +906,40 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                   <XCircle size={38} color="#fff" />
                 </div>
 
-                {(statusMsg.includes("DUPLICATE FACE") || statusMsg.includes("already registered to") || existingStudent) ? (
+                {((statusMsg && statusMsg.includes("UNCERTAIN")) || (statusMsg && statusMsg.includes("insufficient"))) ? (
+                  <div style={{ background: "#451a03", border: "1.5px solid #f59e0b", borderRadius: 14, padding: "14px 16px", textAlign: "left", width: "100%", marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fef3c7", fontWeight: 800, fontSize: 14, marginBottom: 10 }}>
+                      <AlertTriangle size={18} color="#f59e0b" />
+                      UNCERTAIN MATCH — ACTION REQUIRED
+                    </div>
+                    <div style={{ fontSize: 12, color: "#fde68a", lineHeight: 1.6, marginBottom: 10 }}>
+                      The AI system could not verify the face with sufficient certainty. To ensure facial biometric integrity:
+                      <ul style={{ margin: "6px 0 0 16px", padding: 0 }}>
+                        <li>Improve lighting on your face (avoid strong backlighting).</li>
+                        <li>Face the camera directly without tilting.</li>
+                        <li>Ensure the lens is clean and hold steady.</li>
+                      </ul>
+                    </div>
+                    <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fcd34d" }}>
+                      💡 <strong>Guidance:</strong> Please click <strong>Capture Again</strong> to realign and capture fresh biometric frames.
+                    </div>
+                  </div>
+                ) : (statusMsg.includes("DUPLICATE FACE") || statusMsg.includes("already registered to") || existingStudent) ? (
                   <div style={{ background: "#450a0a", border: "1.5px solid #ef4444", borderRadius: 14, padding: "14px 16px", textAlign: "left", width: "100%", marginBottom: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fca5a5", fontWeight: 800, fontSize: 14, marginBottom: 10 }}>
                       <AlertTriangle size={18} color="#ef4444" />
-                      DUPLICATE FACE DETECTED & REJECTED
+                      FACE ALREADY REGISTERED
                     </div>
 
                     {/* Existing student details card */}
                     {existingStudent && (
                       <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
                         <div style={{ fontSize: 10, textTransform: "uppercase", color: "#f87171", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8 }}>
-                          Already Registered Student
+                          Existing Registered Student
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" }}>
                           <div>
-                            <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Name</div>
+                            <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Student Name</div>
                             <div style={{ fontSize: 13, color: "#fca5a5", fontWeight: 700 }}>{existingStudent.name || "—"}</div>
                           </div>
                           <div>
@@ -934,10 +952,10 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                               <div style={{ fontSize: 12, color: "#fca5a5" }}>{existingStudent.department}</div>
                             </div>
                           )}
-                          {existingStudent.semester && (
+                          {existingStudent.status && (
                             <div>
-                              <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Semester</div>
-                              <div style={{ fontSize: 12, color: "#fca5a5" }}>Sem {existingStudent.semester}</div>
+                              <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Face Status</div>
+                              <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>{existingStudent.status}</div>
                             </div>
                           )}
                         </div>
@@ -945,8 +963,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                     )}
 
                     <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fde68a", lineHeight: 1.6 }}>
-                      <strong>🔒 Biometric Security Policy:</strong> A student's face can only be registered once.
-                      The same face cannot be registered under multiple roll numbers.
+                      <strong>🔒 Registration Blocked:</strong> Please select the correct student. This face cannot be registered again.
                     </div>
                   </div>
                 ) : (
