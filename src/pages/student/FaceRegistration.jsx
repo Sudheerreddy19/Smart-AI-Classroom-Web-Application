@@ -433,8 +433,10 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
   const [statusMsg, setStatusMsg]     = useState("");
   const [elapsed, setElapsed]         = useState(0);
   const [frameProgress, setFrameProgress] = useState(0);
+  const [realFramesCaptured, setRealFramesCaptured] = useState(0);
+  const [existingStudent, setExistingStudent] = useState(null);  // For duplicate detection
 
-  // Live frame counter during capture stage (1 to 20 frames)
+  // Animated frame counter during capture stage (simulates 1-20 progress, actual count from API)
   useEffect(() => {
     let frameTimer = null;
     if (stage === "capturing") {
@@ -635,28 +637,40 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
     }
 
     setStage("capturing");
-    setStatusMsg("Class AI Agent is capturing 20 biometric angles... Please hold still.");
+    setExistingStudent(null);
+    setRealFramesCaptured(0);
+    setStatusMsg("Class AI Agent is capturing biometric frames... Look directly at the camera.");
 
     try {
       // 2. Call backend -> dispatches CAPTURE_JOB to Python Agent via WebSocket
       const { data } = await axiosClient.post(`/faces/register/${student.id}`);
       
       if (data.success) {
+        const frames = data.imagesCaptured || 20;
+        setRealFramesCaptured(frames);
         setStage("success");
-        setStatusMsg(`Face registered successfully! ${data.imagesCaptured || 20} angles captured.`);
-        toast.success(`Face registered for ${student.firstName}!`);
+        setStatusMsg(`Face registered! ${frames} biometric frames captured & encoded.`);
+        toast.success(`✅ Face registered for ${student.firstName}! (${frames} frames)`);
         onSuccess(data);
         setTimeout(() => {
           onClose();
-        }, 2200);
+        }, 2500);
       } else {
         setStage("error");
         setStatusMsg(data.message || "Face capture failed. Please retry.");
+        // If duplicate face detected, store existing student info
+        if (data.existingStudent) {
+          setExistingStudent(data.existingStudent);
+        }
       }
     } catch (err) {
       setStage("error");
-      const msg = err.response?.data?.message || "Capture failed. Ensure Class AI service is running on laptop.";
+      const errData = err.response?.data;
+      const msg = errData?.message || "Capture failed. Ensure Class AI service is running on laptop.";
       setStatusMsg(msg);
+      if (errData?.existingStudent) {
+        setExistingStudent(errData.existingStudent);
+      }
     }
   };
 
@@ -871,8 +885,17 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                 <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>
                   {statusMsg}
                 </div>
-                <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700 }}>
-                  ✓ 20 biometric frames encoded and registered
+                {/* Real frames captured from AI Agent */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: "#052e16", border: "1px solid #16a34a", borderRadius: 10, padding: "8px 16px" }}>
+                  <span style={{ fontSize: 22 }}>📸</span>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: "#4ade80" }}>{realFramesCaptured || 20}</div>
+                    <div style={{ fontSize: 11, color: "#86efac" }}>biometric frames captured & encoded</div>
+                  </div>
+                  <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700 }}>✓ Verified</span>
+                    <span style={{ fontSize: 11, color: "#86efac" }}>by AI Agent</span>
+                  </div>
                 </div>
               </>
             )}
@@ -883,17 +906,47 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                   <XCircle size={38} color="#fff" />
                 </div>
 
-                {statusMsg.includes("DUPLICATE FACE") || statusMsg.includes("already registered to") ? (
+                {(statusMsg.includes("DUPLICATE FACE") || statusMsg.includes("already registered to") || existingStudent) ? (
                   <div style={{ background: "#450a0a", border: "1.5px solid #ef4444", borderRadius: 14, padding: "14px 16px", textAlign: "left", width: "100%", marginBottom: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fca5a5", fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fca5a5", fontWeight: 800, fontSize: 14, marginBottom: 10 }}>
                       <AlertTriangle size={18} color="#ef4444" />
                       DUPLICATE FACE DETECTED & REJECTED
                     </div>
-                    <div style={{ fontSize: 13, color: "#fecaca", lineHeight: 1.5, marginBottom: 10 }}>
-                      {statusMsg}
-                    </div>
-                    <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fde68a", lineHeight: 1.5 }}>
-                      <strong>Biometric Security Policy:</strong> A student's face can only be registered once. The same face cannot be registered under multiple roll numbers.
+
+                    {/* Existing student details card */}
+                    {existingStudent && (
+                      <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, textTransform: "uppercase", color: "#f87171", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8 }}>
+                          Already Registered Student
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" }}>
+                          <div>
+                            <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Name</div>
+                            <div style={{ fontSize: 13, color: "#fca5a5", fontWeight: 700 }}>{existingStudent.name || "—"}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Roll Number</div>
+                            <div style={{ fontSize: 13, color: "#f87171", fontWeight: 800, fontFamily: "monospace" }}>{existingStudent.rollNumber || "—"}</div>
+                          </div>
+                          {existingStudent.department && (
+                            <div>
+                              <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Department</div>
+                              <div style={{ fontSize: 12, color: "#fca5a5" }}>{existingStudent.department}</div>
+                            </div>
+                          )}
+                          {existingStudent.semester && (
+                            <div>
+                              <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Semester</div>
+                              <div style={{ fontSize: 12, color: "#fca5a5" }}>Sem {existingStudent.semester}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fde68a", lineHeight: 1.6 }}>
+                      <strong>🔒 Biometric Security Policy:</strong> A student's face can only be registered once.
+                      The same face cannot be registered under multiple roll numbers.
                     </div>
                   </div>
                 ) : (
@@ -908,7 +961,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                 )}
 
                 <button
-                  onClick={() => setStage("aligning")}
+                  onClick={() => { setStage("aligning"); setExistingStudent(null); }}
                   style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
                 >
                   Try Again
