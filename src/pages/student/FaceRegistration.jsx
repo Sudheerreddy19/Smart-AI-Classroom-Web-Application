@@ -436,17 +436,17 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
   const [realFramesCaptured, setRealFramesCaptured] = useState(0);
   const [existingStudent, setExistingStudent] = useState(null);  // For duplicate detection
 
-  // Animated frame counter during capture stage (simulates 1-20 progress, actual count from API)
+  // Animated frame counter during capture stage (1-5 frames)
   useEffect(() => {
     let frameTimer = null;
     if (stage === "capturing") {
       setFrameProgress(1);
       frameTimer = setInterval(() => {
         setFrameProgress(prev => {
-          if (prev >= 20) return 20;
+          if (prev >= 5) return 5;
           return prev + 1;
         });
-      }, 140);
+      }, 700);
     } else {
       setFrameProgress(0);
       clearInterval(frameTimer);
@@ -854,22 +854,22 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, fontWeight: 800, color: "#38bdf8", marginBottom: 6 }}>
                     <span>Frame Progress</span>
                     <span style={{ background: "#1e293b", padding: "2px 8px", borderRadius: 6, border: "1px solid #334155" }}>
-                      {frameProgress} / 20 Frames
+                      {frameProgress} / 5 Frames
                     </span>
                   </div>
                   <div style={{ width: "100%", height: 12, background: "#0f172a", borderRadius: 99, overflow: "hidden", border: "1px solid #334155" }}>
                     <div style={{
-                      width: `${(frameProgress / 20) * 100}%`,
+                      width: `${(frameProgress / 5) * 100}%`,
                       height: "100%",
                       background: "linear-gradient(90deg, #38bdf8, #22c55e)",
                       borderRadius: 99,
-                      transition: "width 0.15s ease-out"
+                      transition: "width 0.25s ease-out"
                     }} />
                   </div>
                 </div>
 
                 <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 360 }}>
-                  AI Agent is reading 20 facial angles (frontal, tilted, micro-expressions). Hold still!
+                  Class AI Agent is reading 5 high-precision facial biometric angles. Hold still!
                 </div>
               </>
             )}
