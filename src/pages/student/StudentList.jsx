@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Search, Download, Upload, Plus, Eye, Pencil, Trash2, Users, UserCheck, UserX, Loader2, RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Download, Upload, Plus, Eye, Pencil, Trash2, Users, UserCheck, UserX, Loader2, RefreshCw, Camera } from "lucide-react";
 import { fetchStudents, createStudent, updateStudent, deleteStudent, selectStudents } from "../../store/slices/studentSlice";
 import { fetchDepartments, selectDepartments } from "../../store/slices/departmentSlice";
 import { fetchSemesters, selectSemesters } from "../../store/slices/semesterSlice";
@@ -21,6 +22,7 @@ const tabs = ["All Students", "Active", "Inactive", "By Class", "By Subject"];
 
 export default function StudentList() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { list, loading, pagination } = useSelector(selectStudents);
   const { list: departments } = useSelector(selectDepartments);
   const { list: semesters } = useSelector(selectSemesters);
@@ -217,15 +219,19 @@ export default function StudentList() {
                 {filtered.length === 0 ? (
                   <tr><td colSpan={9} className="text-center py-12 text-gray-400 text-sm">No students found.</td></tr>
                 ) : filtered.map((s, i) => (
-                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                  <tr
+                    key={s.id}
+                    onClick={() => setViewStudent(s)}
+                    className="border-b border-gray-50 hover:bg-blue-50/50 cursor-pointer transition"
+                  >
                     <td className="px-4 py-3 text-gray-500">{page * 10 + i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-gray-700">{s.rollNumber}</td>
+                    <td className="px-4 py-3 font-medium text-blue-600">{s.rollNumber}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-xs font-semibold text-blue-700">
                           {s.firstName?.[0]}{s.lastName?.[0]}
                         </div>
-                        <span className="font-medium text-gray-800">{s.firstName} {s.lastName}</span>
+                        <span className="font-semibold text-gray-800">{s.firstName} {s.lastName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{s.departmentName || "—"}</td>
@@ -233,15 +239,29 @@ export default function StudentList() {
                     <td className="px-4 py-3 text-gray-600 text-xs">{s.email}</td>
                     <td className="px-4 py-3 text-gray-600">{s.phone || "—"}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                        {s.active ? "Active" : "Inactive"}
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                        s.registrationStatus === 'FACE_REGISTERED'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : s.active
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-red-100 text-red-600'
+                      }`}>
+                        {s.registrationStatus === 'FACE_REGISTERED' ? 'Face Registered' : s.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setViewStudent(s)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="View"><Eye size={14} /></button>
-                        {canEditStudent   && <button onClick={() => openEdit(s)} className="p-1 text-green-500 hover:bg-green-50 rounded" title="Edit"><Pencil size={14} /></button>}
-                        {canDeleteStudent && <button onClick={() => setDeleteId(s.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete"><Trash2 size={14} /></button>}
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => navigate('/face-registration')}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md text-xs font-medium shadow-sm transition"
+                          title="Register Face"
+                        >
+                          <Camera size={13} />
+                          <span>Face</span>
+                        </button>
+                        <button onClick={() => setViewStudent(s)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="View"><Eye size={14} /></button>
+                        {canEditStudent   && <button onClick={() => openEdit(s)} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Edit"><Pencil size={14} /></button>}
+                        {canDeleteStudent && <button onClick={() => setDeleteId(s.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash2 size={14} /></button>}
                       </div>
                     </td>
                   </tr>
@@ -365,17 +385,29 @@ export default function StudentList() {
       <Modal isOpen={!!viewStudent} onClose={() => setViewStudent(null)} title="Student Details" size="md">
         {viewStudent && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-xl font-bold text-blue-700">
-                {viewStudent.firstName?.[0]}{viewStudent.lastName?.[0]}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-xl font-bold text-blue-700">
+                  {viewStudent.firstName?.[0]}{viewStudent.lastName?.[0]}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{viewStudent.firstName} {viewStudent.lastName}</h3>
+                  <p className="text-sm text-gray-500">{viewStudent.rollNumber}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${viewStudent.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                    {viewStudent.active ? "Active" : "Inactive"}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{viewStudent.firstName} {viewStudent.lastName}</h3>
-                <p className="text-sm text-gray-500">{viewStudent.rollNumber}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${viewStudent.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                  {viewStudent.active ? "Active" : "Inactive"}
-                </span>
-              </div>
+              <button
+                onClick={() => {
+                  setViewStudent(null);
+                  navigate('/face-registration');
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-semibold shadow transition"
+              >
+                <Camera size={16} />
+                <span>Register Face</span>
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               {[
