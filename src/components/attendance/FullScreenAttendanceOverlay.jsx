@@ -41,10 +41,13 @@ export default function FullScreenAttendanceOverlay({
   const [isClosing, setIsClosing] = useState(false)
   const [summaryMessage, setSummaryMessage] = useState('')
   const [webcamActive, setWebcamActive] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(60) // 60 seconds auto-close timer
 
   const pollingRef = useRef(null)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const timerRef = useRef(null)
+  const handleCompleteRef = useRef(null)
 
   // Attach live browser webcam stream so user sees their actual face video in cockpit
   useEffect(() => {
@@ -169,6 +172,7 @@ export default function FullScreenAttendanceOverlay({
   const handleComplete = async () => {
     setIsClosing(true)
     if (pollingRef.current) clearInterval(pollingRef.current)
+    if (timerRef.current) clearInterval(timerRef.current)
 
     try {
       if (session?.sessionId) {
@@ -184,7 +188,7 @@ export default function FullScreenAttendanceOverlay({
         setTimeout(() => {
           setIsClosing(false)
           onClose()
-        }, 4000)
+        }, 3500)
         return
       }
 
@@ -196,6 +200,34 @@ export default function FullScreenAttendanceOverlay({
       onClose()
     }
   }
+
+  // Keep ref up to date
+  useEffect(() => {
+    handleCompleteRef.current = handleComplete
+  })
+
+  // 1-minute auto-close countdown timer
+  useEffect(() => {
+    if (!isOpen || isClosing || isPaused) return
+
+    setTimeLeft(60)
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current)
+          if (handleCompleteRef.current) {
+            handleCompleteRef.current()
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [isOpen, isClosing, isPaused])
 
   // Cancel attendance
   const handleCancel = async () => {
@@ -254,8 +286,17 @@ export default function FullScreenAttendanceOverlay({
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls & Auto-Close Timer */}
         <div className="flex items-center gap-3">
+          {/* 60s Live Auto-Close Timer Badge */}
+          <div className="flex items-center gap-2 rounded-xl bg-slate-900 border border-cyan-500/30 px-3.5 py-2 text-xs font-mono">
+            <Clock className={`h-4 w-4 ${timeLeft <= 10 ? 'text-rose-400 animate-ping' : 'text-cyan-400'}`} />
+            <span className="text-slate-400">Auto-close:</span>
+            <span className={`font-bold ${timeLeft <= 10 ? 'text-rose-400' : 'text-cyan-300'}`}>
+              {timeLeft}s
+            </span>
+          </div>
+
           {isPaused ? (
             <button
               onClick={handleResume}
