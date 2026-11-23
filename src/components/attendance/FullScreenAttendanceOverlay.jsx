@@ -72,6 +72,9 @@ export default function FullScreenAttendanceOverlay({
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play().catch(() => {})
+          }
         }
         setWebcamActive(true)
       } catch (err) {
