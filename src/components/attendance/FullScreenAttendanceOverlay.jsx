@@ -40,8 +40,56 @@ export default function FullScreenAttendanceOverlay({
   const [cameraStatus, setCameraStatus] = useState('CONNECTING') // CONNECTING | OPEN | PAUSED | CLOSED | ERROR
   const [isClosing, setIsClosing] = useState(false)
   const [summaryMessage, setSummaryMessage] = useState('')
+  const [webcamActive, setWebcamActive] = useState(false)
 
   const pollingRef = useRef(null)
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+
+  // Attach live browser webcam stream so user sees their actual face video in cockpit
+  useEffect(() => {
+    if (!isOpen) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      setWebcamActive(false)
+      return
+    }
+
+    let isMounted = true
+
+    async function setupWebcam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+          audio: false,
+        })
+        if (!isMounted) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        }
+        setWebcamActive(true)
+      } catch (err) {
+        console.warn('Browser webcam view could not be attached directly:', err)
+        setWebcamActive(false)
+      }
+    }
+
+    setupWebcam()
+
+    return () => {
+      isMounted = false
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+      }
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (sessionData) {
@@ -64,8 +112,12 @@ export default function FullScreenAttendanceOverlay({
 
         // Also check camera/agent status
         const agentRes = await attendanceApi.getAgentStatus()
-        if (agentRes?.data?.cameraStatus) {
+        if (agentRes?.data?.connected) {
+          if (!isPaused) setCameraStatus('OPEN')
+        } else if (agentRes?.data?.cameraStatus) {
           setCameraStatus(agentRes.data.cameraStatus)
+        } else {
+          setCameraStatus('CONNECTING')
         }
       } catch (err) {
         console.error('Error polling attendance session:', err)
@@ -247,31 +299,63 @@ export default function FullScreenAttendanceOverlay({
       <div className="flex-1 grid grid-cols-12 gap-6 p-8 overflow-hidden">
         {/* Left Column: Live Camera & Stats (5 columns) */}
         <div className="col-span-5 flex flex-col gap-6">
-          {/* Camera Viewport Simulation */}
-          <div className="relative flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/50 p-6 overflow-hidden h-72 shadow-2xl">
-            {/* Pulsing Scan Grid overlay */}
-            <div className="absolute inset-0 bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:16px_16px] opacity-15" />
+          {/* Camera Viewport (Live Video Feed & Scanning HUD) */}
+          <div className="relative flex flex-col items-center justify-center rounded-3xl border border-cyan-500/30 bg-slate-900/80 overflow-hidden h-72 shadow-2xl">
+            {/* Live Video Feed Element */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                webcamActive && !isPaused ? 'opacity-90' : 'opacity-0'
+              }`}
+            />
 
-            <div className="relative flex flex-col items-center text-center z-10">
-              <div className="relative mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-cyan-500/10 border-2 border-cyan-400/40 shadow-inner shadow-cyan-500/20">
-                <Camera className="h-10 w-10 text-cyan-400 animate-pulse" />
-                {!isPaused && (
-                  <div className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-ping opacity-25" />
-                )}
+            {/* Glowing Face Scanning HUD overlay */}
+            {webcamActive && !isPaused && (
+              <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4">
+                <div className="flex justify-between items-center text-[11px] font-mono font-bold text-cyan-400 bg-slate-950/70 px-3 py-1 rounded-full backdrop-blur-md border border-cyan-500/30 w-fit">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                    AI VISION ACTIVE (20 FPS)
+                  </span>
+                </div>
+                {/* Center target brackets */}
+                <div className="self-center flex items-center justify-center h-32 w-32 rounded-2xl border-2 border-dashed border-cyan-400/60 animate-pulse">
+                  <span className="text-[10px] uppercase font-mono text-cyan-300/80 bg-slate-950/80 px-2 py-0.5 rounded">Face Target</span>
+                </div>
+                <div className="text-[11px] font-mono text-slate-300 bg-slate-950/70 px-3 py-1 rounded-full backdrop-blur-md border border-slate-700 w-fit">
+                  Webcam Active • Live Recognition
+                </div>
               </div>
+            )}
 
-              <h3 className="text-base font-semibold text-slate-100">
-                {isPaused ? 'Camera Paused' : 'Laptop Webcam Active'}
-              </h3>
-              <p className="mt-1 text-xs text-slate-400 max-w-xs">
-                {isPaused
-                  ? 'Face recognition is paused. Click Resume to continue.'
-                  : 'OpenCV AI Agent is analyzing classroom video feed in real time.'}
-              </p>
+            {/* Fallback placeholder when camera is paused or loading */}
+            {(!webcamActive || isPaused) && (
+              <>
+                <div className="absolute inset-0 bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:16px_16px] opacity-15" />
+                <div className="relative flex flex-col items-center text-center z-10">
+                  <div className="relative mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-cyan-500/10 border-2 border-cyan-400/40 shadow-inner shadow-cyan-500/20">
+                    <Camera className="h-10 w-10 text-cyan-400 animate-pulse" />
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-100">
+                    {isPaused ? 'Camera Paused' : 'Laptop Webcam Active'}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-400 max-w-xs">
+                    {isPaused
+                      ? 'Face recognition is paused. Click Resume to continue.'
+                      : 'OpenCV AI Agent is analyzing classroom video feed in real time.'}
+                  </p>
+                </div>
+              </>
+            )}
 
-              <div className="mt-4 flex items-center gap-2 rounded-full bg-slate-800/80 px-3 py-1 text-xs border border-slate-700">
-                <span className={`h-2 w-2 rounded-full ${cameraStatus === 'OPEN' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="font-mono text-slate-300">Status: {cameraStatus}</span>
+            {/* Status Badge */}
+            <div className="absolute bottom-3 z-20">
+              <div className="flex items-center gap-2 rounded-full bg-slate-950/80 px-3 py-1 text-xs border border-cyan-500/30 backdrop-blur-md">
+                <span className={`h-2 w-2 rounded-full ${cameraStatus === 'OPEN' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span className="font-mono text-slate-200">Status: {isPaused ? 'PAUSED' : cameraStatus}</span>
               </div>
             </div>
           </div>
