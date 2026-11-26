@@ -644,7 +644,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
     try {
       // 2. Call backend -> dispatches CAPTURE_JOB to Python Agent via WebSocket
       const camIdx = (typeof localStorage !== 'undefined' && localStorage.getItem('classai_preferred_camera_index')) || '0';
-      const { data } = await axiosClient.post(/faces/register/?cameraIndex=);
+      const { data } = await axiosClient.post(`/faces/register/${student.id}?cameraIndex=${camIdx}`);
       
       if (data.success) {
         const frames = data.imagesCaptured || 20;
