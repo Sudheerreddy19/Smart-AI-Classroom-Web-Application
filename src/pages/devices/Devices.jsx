@@ -62,7 +62,20 @@ export default function Devices() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-bold text-gray-900">Devices</h1><p className="text-sm text-gray-500 mt-0.5">Monitor and control all classroom IoT devices.</p></div>
+        <div><h1 className="text-2xl font-bold text-gray-900">Devices & Hardware Manager</h1>
+      <div className="mt-4 mb-6 p-4 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-600 text-white rounded-lg"><Zap size={18} /></div>
+          <div>
+            <div className="text-sm font-bold text-gray-900">Active Face Recognition Camera Source</div>
+            <div className="text-xs text-gray-600">Python AI Agent Capture Source: <strong className="text-blue-700">{typeof localStorage !== "undefined" && localStorage.getItem("classai_preferred_camera_index") === "1" ? "External USB Webcam (Index 1 - iBall Phocus 18B)" : "Built-in Camera (Index 0 - HP True Vision FHD) [Default]"}</strong></div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={async () => { localStorage.setItem("classai_preferred_camera_index", "1"); try { await fetch("http://localhost:8000/camera/select", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index: 1 }) }); } catch (err) {} window.location.reload(); }} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 shadow-sm transition">Prefer External (Index 1 - iBall)</button>
+          <button type="button" onClick={async () => { localStorage.setItem("classai_preferred_camera_index", "0"); try { await fetch("http://localhost:8000/camera/select", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index: 0 }) }); } catch (err) {} window.location.reload(); }} className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-semibold rounded-g hover:bg-gray-50 transition">Use Built-in (Index 0)</button>
+        </div>
+      </div><p className="text-sm text-gray-500 mt-0.5">Monitor and control all classroom IoT devices.</p></div>
         <div className="flex gap-3">
           <button onClick={() => dispatch(fetchDevices())} className="p-2 text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"><RefreshCw size={16} /></button>
           {canManageDevices && (
