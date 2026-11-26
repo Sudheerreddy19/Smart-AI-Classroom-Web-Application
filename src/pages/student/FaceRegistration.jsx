@@ -902,6 +902,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                 <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 360 }}>
                   Class AI Agent is reading 5 high-precision facial biometric angles. Hold still!
                 </div>
+                </div>
               </>
             )}
 
@@ -931,9 +932,6 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
               </>
             )}
 
-            </div>
-              </>
-            )}
 
             {stage === "error" && (
               <>
