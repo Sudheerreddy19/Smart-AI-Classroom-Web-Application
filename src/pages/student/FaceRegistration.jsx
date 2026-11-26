@@ -838,21 +838,6 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
             {stage === "capturing" && (
               <>
                 {/* Live Camera Stream directly from Python Agent (port 8001) */}
-                <img
-                  src="http://localhost:8001/video_feed"
-                  alt="Live Biometric Capture Feed"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  onLoad={(e) => { e.currentTarget.style.display = 'block'; }}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    borderRadius: 14,
-                    zIndex: 0
-                  }}
-                />
 
                 <div style={{
                   position: "relative",
