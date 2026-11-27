@@ -1,3 +1,4 @@
+﻿import { getPreferredCameraConstraints } from '../../utils/hardwareDevices';
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -5,13 +6,13 @@ import { Camera, StopCircle, Zap, ZapOff, VideoOff, Users } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 
 const CODE_MAP = {
-  MARKED:           { emoji:"✅", color:"#16a34a", bg:"#f0fdf4", label:"Present!" },
-  DUPLICATE:        { emoji:"🔵", color:"#2563eb", bg:"#eff6ff", label:"Already Marked" },
-  NO_FACE:          { emoji:"❌", color:"#dc2626", bg:"#fef2f2", label:"No Face" },
-  MULTIPLE_FACES:   { emoji:"⚠️", color:"#d97706", bg:"#fffbeb", label:"Multiple Faces" },
-  UNKNOWN:          { emoji:"❓", color:"#6b7280", bg:"#f9fafb", label:"Not Recognised" },
-  SESSION_CLOSED:   { emoji:"🔒", color:"#6b7280", bg:"#f9fafb", label:"Session Closed" },
-  MARKED_PYTHON_ONLY:{ emoji:"🟡", color:"#b45309", bg:"#fefce8", label:"Marked (unlinked)" },
+  MARKED:           { emoji:"âœ…", color:"#16a34a", bg:"#f0fdf4", label:"Present!" },
+  DUPLICATE:        { emoji:"ðŸ”µ", color:"#2563eb", bg:"#eff6ff", label:"Already Marked" },
+  NO_FACE:          { emoji:"âŒ", color:"#dc2626", bg:"#fef2f2", label:"No Face" },
+  MULTIPLE_FACES:   { emoji:"âš ï¸", color:"#d97706", bg:"#fffbeb", label:"Multiple Faces" },
+  UNKNOWN:          { emoji:"â“", color:"#6b7280", bg:"#f9fafb", label:"Not Recognised" },
+  SESSION_CLOSED:   { emoji:"ðŸ”’", color:"#6b7280", bg:"#f9fafb", label:"Session Closed" },
+  MARKED_PYTHON_ONLY:{ emoji:"ðŸŸ¡", color:"#b45309", bg:"#fefce8", label:"Marked (unlinked)" },
 };
 
 const AUTO_SCAN_MS = 3500;
@@ -56,7 +57,7 @@ export default function TakeAttendance() {
   sessionRef.current  = session;
   scanningRef.current = scanning;
 
-  // ── Camera ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Camera â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:640, height:480, facingMode:"user" } });
@@ -81,7 +82,7 @@ export default function TakeAttendance() {
     return c.toDataURL("image/jpeg", 0.80);
   }, []);
 
-  // ── Core scan — calls /attendance/face-mark-multi ─────────────────────────
+  // â”€â”€ Core scan â€” calls /attendance/face-mark-multi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const doScan = useCallback(async (sess) => {
     const frame = captureFrame();
     if (!frame) return;
@@ -102,15 +103,15 @@ export default function TakeAttendance() {
       if (newlyMarked.length > 0) {
         setLog(prev => [...newlyMarked, ...prev]);
         if (newlyMarked.length === 1) {
-          toast.success(`✅ ${newlyMarked[0].studentName} marked Present!`);
+          toast.success(`âœ… ${newlyMarked[0].studentName} marked Present!`);
         } else {
-          toast.success(`✅ ${newlyMarked.length} students marked Present!`);
+          toast.success(`âœ… ${newlyMarked.length} students marked Present!`);
         }
       }
 
       const unknowns = batch.filter(r => r.code === "UNKNOWN").length;
       if (unknowns > 0 && newlyMarked.length === 0) {
-        // silent — face detected but not enrolled
+        // silent â€” face detected but not enrolled
       }
 
     } catch (err) {
@@ -121,7 +122,7 @@ export default function TakeAttendance() {
     setScanning(false);
   }, [captureFrame]);
 
-  // ── Auto-scan timer ────────────────────────────────────────────────────────
+  // â”€â”€ Auto-scan timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const clearTimer = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
 
   useEffect(() => {
@@ -133,7 +134,7 @@ export default function TakeAttendance() {
     return clearTimer;
   }, [session, autoScan, camOn, doScan]);
 
-  // ── Start session ──────────────────────────────────────────────────────────
+  // â”€â”€ Start session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleStart = async (e) => {
     e.preventDefault();
     if (!form.classroomId || !form.subjectId || !form.teacherId) { toast.error("Fill all fields."); return; }
@@ -148,7 +149,7 @@ export default function TakeAttendance() {
       });
       setSession(data);
       await startCamera();
-      toast.success("Session started — scanning for all faces every 3.5 s");
+      toast.success("Session started â€” scanning for all faces every 3.5 s");
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to start session.");
     }
@@ -178,16 +179,16 @@ export default function TakeAttendance() {
         <div style={{ background:"#eff6ff", borderRadius:12, padding:10 }}><Camera size={24} color="#2563eb"/></div>
         <div>
           <h1 style={{ fontSize:22, fontWeight:700, color:"#111827", margin:0 }}>Multi-Face Attendance</h1>
-          <p style={{ color:"#6b7280", fontSize:13, margin:0 }}>Detects all faces in one frame — marks all students simultaneously</p>
+          <p style={{ color:"#6b7280", fontSize:13, margin:0 }}>Detects all faces in one frame â€” marks all students simultaneously</p>
         </div>
         <button onClick={() => navigate("/attendance/report")}
           style={{ marginLeft:"auto", background:"#7c3aed", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontWeight:600, fontSize:13, cursor:"pointer" }}>
-          📊 Report
+          ðŸ“Š Report
         </button>
       </div>
 
       {!session ? (
-        /* ── Setup ── */
+        /* â”€â”€ Setup â”€â”€ */
         <div style={{ background:"#fff", borderRadius:16, padding:28, border:"1px solid #e5e7eb", maxWidth:640 }}>
           <h2 style={{ fontWeight:700, fontSize:15, color:"#374151", marginBottom:20 }}>Start Attendance Session</h2>
           <form onSubmit={handleStart}>
@@ -200,7 +201,7 @@ export default function TakeAttendance() {
                   <label style={{ fontSize:12, fontWeight:500, color:"#374151", display:"block", marginBottom:5 }}>{label}</label>
                   <select name={name} value={form[name]} onChange={e=>setForm(f=>({...f,[e.target.name]:e.target.value}))} required
                     style={{ width:"100%", padding:"9px 12px", borderRadius:9, border:"1px solid #d1d5db", fontSize:13 }}>
-                    <option value="">Select…</option>
+                    <option value="">Selectâ€¦</option>
                     {opts.map(o=><option key={o.id} value={o.id}>{disp(o)}</option>)}
                   </select>
                 </div>
@@ -228,13 +229,13 @@ export default function TakeAttendance() {
             </div>
             <button type="submit" disabled={creating}
               style={{ width:"100%", background:"#2563eb", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
-              <Users size={18}/> {creating ? "Starting…" : "▶ Start Multi-Face Session"}
+              <Users size={18}/> {creating ? "Startingâ€¦" : "â–¶ Start Multi-Face Session"}
             </button>
           </form>
         </div>
 
       ) : (
-        /* ── Active session ── */
+        /* â”€â”€ Active session â”€â”€ */
         <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:20 }}>
 
           {/* Camera panel */}
@@ -243,9 +244,9 @@ export default function TakeAttendance() {
             <div style={{ background:"#fff", borderRadius:14, padding:"12px 18px", border:"1px solid #e5e7eb", marginBottom:14,
               display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
               <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-                <span style={{ background:"#f0fdf4", color:"#16a34a", borderRadius:8, padding:"4px 12px", fontSize:12, fontWeight:700 }}>● ACTIVE</span>
+                <span style={{ background:"#f0fdf4", color:"#16a34a", borderRadius:8, padding:"4px 12px", fontSize:12, fontWeight:700 }}>â— ACTIVE</span>
                 <span style={{ fontSize:13, color:"#374151", fontWeight:600 }}>{subjName}</span>
-                <span style={{ fontSize:12, color:"#6b7280" }}>Room {roomName} · {form.sessionDate}</span>
+                <span style={{ fontSize:12, color:"#6b7280" }}>Room {roomName} Â· {form.sessionDate}</span>
                 <span style={{ background:"#eff6ff", color:"#2563eb", borderRadius:8, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
                   <Users size={11} style={{ display:"inline", marginRight:4 }}/>{marked} Present
                 </span>
@@ -257,7 +258,7 @@ export default function TakeAttendance() {
                 </button>
                 <button onClick={handleClose} disabled={closing}
                   style={{ background:"#dc2626", color:"#fff", border:"none", borderRadius:9, padding:"8px 14px", fontWeight:600, fontSize:12, cursor:"pointer", display:"flex", gap:6, alignItems:"center" }}>
-                  <StopCircle size={13}/> {closing?"Closing…":"Close Session"}
+                  <StopCircle size={13}/> {closing?"Closingâ€¦":"Close Session"}
                 </button>
               </div>
             </div>
@@ -282,7 +283,7 @@ export default function TakeAttendance() {
               {scanning && (
                 <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(0,0,0,0.25)" }}>
                   <div style={{ padding:"10px 22px", background:"rgba(0,0,0,0.6)", borderRadius:10, color:"#facc15", fontWeight:700, fontSize:14 }}>
-                    ⚡ Scanning all faces…
+                    âš¡ Scanning all facesâ€¦
                   </div>
                 </div>
               )}
@@ -290,7 +291,7 @@ export default function TakeAttendance() {
               {/* Auto badge */}
               {autoScan && camOn && !scanning && (
                 <div style={{ position:"absolute", bottom:12, left:12, background:"rgba(0,0,0,0.55)", color:"#fff", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:600 }}>
-                  ⚡ Auto scanning all faces…
+                  âš¡ Auto scanning all facesâ€¦
                 </div>
               )}
 
@@ -299,17 +300,17 @@ export default function TakeAttendance() {
                 <div style={{ position:"absolute", bottom:12, right:12, display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
                   {lastNew > 0 && (
                     <div style={{ background:"#f0fdf4", color:"#16a34a", border:"1px solid #86efac", borderRadius:9, padding:"5px 12px", fontSize:12, fontWeight:700 }}>
-                      ✅ {lastNew} marked present
+                      âœ… {lastNew} marked present
                     </div>
                   )}
                   {lastResults.filter(r=>r.code==="UNKNOWN").length > 0 && (
                     <div style={{ background:"#f9fafb", color:"#6b7280", border:"1px solid #e5e7eb", borderRadius:9, padding:"5px 12px", fontSize:12 }}>
-                      ❓ {lastResults.filter(r=>r.code==="UNKNOWN").length} unknown face(s)
+                      â“ {lastResults.filter(r=>r.code==="UNKNOWN").length} unknown face(s)
                     </div>
                   )}
                   {lastResults.filter(r=>r.code==="DUPLICATE").length > 0 && (
                     <div style={{ background:"#eff6ff", color:"#2563eb", border:"1px solid #bfdbfe", borderRadius:9, padding:"5px 12px", fontSize:12 }}>
-                      🔵 {lastResults.filter(r=>r.code==="DUPLICATE").length} already marked
+                      ðŸ”µ {lastResults.filter(r=>r.code==="DUPLICATE").length} already marked
                     </div>
                   )}
                 </div>
@@ -322,7 +323,7 @@ export default function TakeAttendance() {
                 style={{ width:"100%", background: scanning||!camOn?"#e5e7eb":"#2563eb", color: scanning||!camOn?"#9ca3af":"#fff",
                   border:"none", borderRadius:12, padding:"15px", fontWeight:700, fontSize:16, cursor: scanning||!camOn?"not-allowed":"pointer",
                   display:"flex", alignItems:"center", justifyContent:"center", gap:12 }}>
-                <Users size={20}/> {scanning?"Scanning all faces…":"📸 Scan All Faces Now"}
+                <Users size={20}/> {scanning?"Scanning all facesâ€¦":"ðŸ“¸ Scan All Faces Now"}
               </button>
             )}
 
@@ -330,7 +331,7 @@ export default function TakeAttendance() {
             {lastResults.length > 0 && (
               <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e5e7eb", padding:"14px 18px", marginTop:12 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:"#6b7280", marginBottom:10 }}>
-                  Last Scan — {lastResults.length} face(s) detected
+                  Last Scan â€” {lastResults.length} face(s) detected
                 </div>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                   {lastResults.map((r,i) => {
@@ -357,21 +358,21 @@ export default function TakeAttendance() {
                 Present ({marked})
               </span>
               <button onClick={() => navigate("/attendance/report")}
-                style={{ background:"none", border:"none", cursor:"pointer", color:"#7c3aed", fontSize:12, fontWeight:600 }}>📊 Report</button>
+                style={{ background:"none", border:"none", cursor:"pointer", color:"#7c3aed", fontSize:12, fontWeight:600 }}>ðŸ“Š Report</button>
             </div>
             <div style={{ flex:1, overflowY:"auto", maxHeight:520 }}>
               {log.length === 0 ? (
                 <div style={{ padding:32, textAlign:"center", color:"#9ca3af", fontSize:13 }}>
                   <Users size={28} style={{ marginBottom:8, opacity:0.2 }}/>
-                  <p style={{ margin:"4px 0" }}>Auto-scanning for faces…</p>
+                  <p style={{ margin:"4px 0" }}>Auto-scanning for facesâ€¦</p>
                   <p style={{ margin:0, fontSize:11 }}>All detected students appear here.</p>
                 </div>
               ) : log.map((entry,i) => (
                 <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 16px", borderBottom:"1px solid #f3f4f6" }}>
-                  <div style={{ width:34, height:34, borderRadius:"50%", background:"#f0fdf4", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>✅</div>
+                  <div style={{ width:34, height:34, borderRadius:"50%", background:"#f0fdf4", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>âœ…</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontWeight:600, fontSize:13, color:"#111827", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{entry.studentName}</div>
-                    <div style={{ fontSize:11, color:"#6b7280" }}>{entry.rollNumber || entry.studentId} · {entry.ts}</div>
+                    <div style={{ fontSize:11, color:"#6b7280" }}>{entry.rollNumber || entry.studentId} Â· {entry.ts}</div>
                   </div>
                 </div>
               ))}

@@ -1,3 +1,4 @@
+﻿import { getPreferredCameraConstraints } from '../../utils/hardwareDevices';
 import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import {
@@ -26,14 +27,14 @@ export default function FaceRegistration() {
   const [modalOpen, setModalOpen]             = useState(false);
   const [captureResult, setCaptureResult]     = useState(null);
 
-  // ── Load departments ────────────────────────────────────────────────────
+  // â”€â”€ Load departments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axiosClient.get("/departments").then(({ data }) => {
       setDepartments(Array.isArray(data) ? data : data.content ?? []);
     }).catch(() => toast.error("Failed to load departments."));
   }, []);
 
-  // ── Load semesters when dept changes ───────────────────────────────────
+  // â”€â”€ Load semesters when dept changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!selDept) { setSemesters([]); setSelSem(""); return; }
     axiosClient.get(`/semesters/department/${selDept}`)
@@ -46,7 +47,7 @@ export default function FaceRegistration() {
       .catch(() => toast.error("Failed to load semesters."));
   }, [selDept]);
 
-  // ── Load students when dept + sem selected ─────────────────────────────
+  // â”€â”€ Load students when dept + sem selected â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!selDept || !selSem) { setStudents([]); return; }
     setLoading(true);
@@ -59,7 +60,7 @@ export default function FaceRegistration() {
       .finally(() => setLoading(false));
   }, [selDept, selSem]);
 
-  // ── Open Alignment Modal ───────────────────────────────────────────────
+  // â”€â”€ Open Alignment Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleOpenCapture = (student) => {
     if (student.registrationStatus === "NOT_REGISTERED") {
       toast.error("Student must create their account first before face registration.");
@@ -177,7 +178,7 @@ export default function FaceRegistration() {
             : <XCircle size={20} />}
           <div>
             <strong>{captureResult.success ? "Face Registered Successfully!" : "Capture Failed"}</strong>
-            <span> — {captureResult.message}</span>
+            <span> â€” {captureResult.message}</span>
             {captureResult.success && (
               <span className="fr-result-detail"> ({captureResult.imagesCaptured || 20} images captured and encoded)</span>
             )}
@@ -187,7 +188,7 @@ export default function FaceRegistration() {
 
       {/* Student List */}
       {loading ? (
-        <div className="fr-loading"><RefreshCw size={24} className="fr-spin" /> Loading students…</div>
+        <div className="fr-loading"><RefreshCw size={24} className="fr-spin" /> Loading studentsâ€¦</div>
       ) : !selDept || !selSem ? (
         <div className="fr-empty">
           <Camera size={48} className="fr-empty-icon" />
@@ -231,7 +232,7 @@ export default function FaceRegistration() {
                       </div>
                     </td>
                     <td><code className="fr-roll">{s.rollNumber}</code></td>
-                    <td>{s.sectionName || "—"}</td>
+                    <td>{s.sectionName || "â€”"}</td>
                     <td>
                       <span className="fr-status" style={{ background: statusCfg.bg, color: statusCfg.text }}>
                         {s.registrationStatus === "FACE_REGISTERED" && <Award size={12} />}
@@ -419,7 +420,7 @@ export default function FaceRegistration() {
   );
 }
 
-// ── Live Biometric Camera & Face Alignment Modal ──────────────────────────────
+// â”€â”€ Live Biometric Camera & Face Alignment Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function CaptureScreenModal({ student, onSuccess, onClose }) {
   const videoRef      = useRef(null);
   const streamRef     = useRef(null);
@@ -428,6 +429,10 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
   const [isAligned,   setIsAligned]   = useState(false);
   const [alignmentMsg, setAlignmentMsg] = useState("Position face inside the oval");
   
+  // Available video devices & selected camera
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+
   // Stages: "aligning" | "capturing" | "success" | "error"
   const [stage, setStage]             = useState("aligning");
   const [statusMsg, setStatusMsg]     = useState("");
@@ -461,18 +466,33 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
 
     async function initCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: "user"
-          },
-          audio: false
-        });
+        setCameraReady(false);
+        setCameraError(null);
+
+        // Enumerate devices to get available camera list
+        if (navigator.mediaDevices?.enumerateDevices) {
+          const devs = await navigator.mediaDevices.enumerateDevices();
+          const cams = devs.filter(d => d.kind === 'videoinput');
+          if (active) setAvailableCameras(cams);
+        }
+
+        const constraints = selectedDeviceId
+          ? { video: { deviceId: { exact: selectedDeviceId }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }
+          : await getPreferredCameraConstraints(640, 480);
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (!active) {
           stream.getTracks().forEach(t => t.stop());
           return;
         }
+
+        // Identify which device was actually opened and set selectedDeviceId
+        const activeTrack = stream.getVideoTracks()[0];
+        const activeSettings = activeTrack?.getSettings?.();
+        if (activeSettings?.deviceId && !selectedDeviceId && active) {
+          setSelectedDeviceId(activeSettings.deviceId);
+        }
+
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -483,7 +503,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
         }
       } catch (err) {
         console.warn("Browser camera access error:", err);
-        setCameraError("Camera permission needed. Please allow webcam access in your browser.");
+        setCameraError("Camera permission needed or camera is in use. Please select another camera or grant access.");
       }
     }
 
@@ -514,7 +534,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
           }
           if (faces.length > 1) {
             setIsAligned(false);
-            setAlignmentMsg("MULTIPLE FACES — ONLY 1 PERSON");
+            setAlignmentMsg("MULTIPLE FACES â€” ONLY 1 PERSON");
             return;
           }
           const box = faces[0].boundingBox;
@@ -541,7 +561,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
             return;
           }
           setIsAligned(true);
-          setAlignmentMsg("FACE ALIGNED & CLEAR ✓");
+          setAlignmentMsg("FACE ALIGNED & CLEAR âœ“");
           return;
         } catch (e) {}
       }
@@ -590,16 +610,16 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
 
         if (avgLum < 25) {
           setIsAligned(false);
-          setAlignmentMsg("LIGHTING TOO DARK — FACE LIGHT");
+          setAlignmentMsg("LIGHTING TOO DARK â€” FACE LIGHT");
         } else if (skinRatio < 0.14) {
           setIsAligned(false);
           setAlignmentMsg("POSITION FACE INSIDE OVAL");
         } else if (sharpness < 5) {
           setIsAligned(false);
-          setAlignmentMsg("HOLD STILL — UNBLURRING");
+          setAlignmentMsg("HOLD STILL â€” UNBLURRING");
         } else {
           setIsAligned(true);
-          setAlignmentMsg("FACE ALIGNED & CLEAR ✓");
+          setAlignmentMsg("FACE ALIGNED & CLEAR âœ“");
         }
       } catch (err) {}
     }, 150);
@@ -611,7 +631,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
     };
-  }, [stage]);
+  }, [stage, selectedDeviceId]);
 
   // Elapsed timer during capturing
   useEffect(() => {
@@ -625,7 +645,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
     return () => clearInterval(t);
   }, [stage]);
 
-  // ── START BIOMETRIC CAPTURE (Release browser cam -> Call Python AI Agent) ───
+  // â”€â”€ START BIOMETRIC CAPTURE (Release browser cam -> Call Python AI Agent) â”€â”€â”€
   const startBiometricCapture = async () => {
     // 1. CRITICAL: Stop browser camera tracks immediately so hardware webcam is 100% free for Python!
     if (streamRef.current) {
@@ -643,7 +663,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
 
     try {
       // 2. Call backend -> dispatches CAPTURE_JOB to Python Agent via WebSocket
-      const camIdx = (typeof localStorage !== 'undefined' && localStorage.getItem('classai_preferred_camera_index')) || '0';
+      const camIdx = (typeof localStorage !== 'undefined' && localStorage.getItem('classai_preferred_camera_index')) || '1';
       const { data } = await axiosClient.post(`/faces/register/${student.id}?cameraIndex=${camIdx}`);
       
       if (data.success) {
@@ -651,7 +671,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
         setRealFramesCaptured(frames);
         setStage("success");
         setStatusMsg(`Face registered! ${frames} biometric frames captured & encoded.`);
-        toast.success(`✅ Face registered for ${student.firstName}! (${frames} frames)`);
+        toast.success(`âœ… Face registered for ${student.firstName}! (${frames} frames)`);
         onSuccess(data);
         setTimeout(() => {
           onClose();
@@ -722,13 +742,20 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                 {stage === "capturing" ? "Biometric Recording in Progress" : stage === "success" ? "Registration Complete!" : "Live Face Alignment"}
               </div>
               <div style={{ fontSize: 12, color: isAligned || stage === "success" ? "#4ade80" : "#f87171", fontWeight: 600 }}>
-                {stage === "capturing" ? "Hold still while AI encodes face…" : stage === "success" ? "Verified & Saved" : isAligned ? "✓ Face Aligned & Clear" : "● Align Face Inside Oval"}
+                {stage === "capturing" ? "Hold still while AI encodes faceâ€¦" : stage === "success" ? "Verified & Saved" : isAligned ? "âœ“ Face Aligned & Clear" : "â— Align Face Inside Oval"}
               </div>
             </div>
           </div>
+          {stage === "aligning" && availableCameras.length > 1 && (
+            <select value={selectedDeviceId} onChange={(e) => setSelectedDeviceId(e.target.value)} style={{ background: "#1e293b", color: "#38bdf8", border: "1px solid #334155", borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 600, outline: "none", cursor: "pointer", maxWidth: 180 }}>
+              {availableCameras.map((cam, idx) => (
+                <option key={cam.deviceId || idx} value={cam.deviceId}>{cam.label || (`Camera ${idx + 1}`)}</option>
+              ))}
+            </select>
+          )}
           {stage === "capturing" && (
             <div style={{ background: "#1e293b", padding: "4px 12px", borderRadius: 99, fontSize: 13, fontWeight: 700, color: "#38bdf8", border: "1px solid #334155" }}>
-              ⏱ {elapsed}s
+              â± {elapsed}s
             </div>
           )}
         </div>
@@ -766,7 +793,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
             {!cameraReady && (
               <div style={{ textAlign: "center", color: "#94a3b8", padding: 20 }}>
                 <RefreshCw size={28} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px" }} />
-                <div style={{ fontSize: 13 }}>{cameraError || "Activating laptop camera…"}</div>
+                <div style={{ fontSize: 13 }}>{cameraError || "Activating laptop cameraâ€¦"}</div>
               </div>
             )}
 
@@ -904,13 +931,13 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                 </div>
                 {/* Real frames captured from AI Agent */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: "#052e16", border: "1px solid #16a34a", borderRadius: 10, padding: "8px 16px" }}>
-                  <span style={{ fontSize: 22 }}>📸</span>
+                  <span style={{ fontSize: 22 }}>ðŸ“¸</span>
                   <div>
                     <div style={{ fontSize: 20, fontWeight: 900, color: "#4ade80" }}>{realFramesCaptured || 20}</div>
                     <div style={{ fontSize: 11, color: "#86efac" }}>biometric frames captured & encoded</div>
                   </div>
                   <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                    <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700 }}>✓ Verified</span>
+                    <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700 }}>âœ“ Verified</span>
                     <span style={{ fontSize: 11, color: "#86efac" }}>by AI Agent</span>
                   </div>
                 </div>
@@ -928,7 +955,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                   <div style={{ background: "#451a03", border: "1.5px solid #f59e0b", borderRadius: 14, padding: "14px 16px", textAlign: "left", width: "100%", marginBottom: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fef3c7", fontWeight: 800, fontSize: 14, marginBottom: 10 }}>
                       <AlertTriangle size={18} color="#f59e0b" />
-                      UNCERTAIN MATCH — ACTION REQUIRED
+                      UNCERTAIN MATCH â€” ACTION REQUIRED
                     </div>
                     <div style={{ fontSize: 12, color: "#fde68a", lineHeight: 1.6, marginBottom: 10 }}>
                       The AI system could not verify the face with sufficient certainty. To ensure facial biometric integrity:
@@ -939,7 +966,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                       </ul>
                     </div>
                     <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fcd34d" }}>
-                      💡 <strong>Guidance:</strong> Please click <strong>Capture Again</strong> to realign and capture fresh biometric frames.
+                      ðŸ’¡ <strong>Guidance:</strong> Please click <strong>Capture Again</strong> to realign and capture fresh biometric frames.
                     </div>
                   </div>
                 ) : (statusMsg.includes("DUPLICATE FACE") || statusMsg.includes("already registered to") || existingStudent) ? (
@@ -958,11 +985,11 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" }}>
                           <div>
                             <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Student Name</div>
-                            <div style={{ fontSize: 13, color: "#fca5a5", fontWeight: 700 }}>{existingStudent.name || "—"}</div>
+                            <div style={{ fontSize: 13, color: "#fca5a5", fontWeight: 700 }}>{existingStudent.name || "â€”"}</div>
                           </div>
                           <div>
                             <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Roll Number</div>
-                            <div style={{ fontSize: 13, color: "#f87171", fontWeight: 800, fontFamily: "monospace" }}>{existingStudent.rollNumber || "—"}</div>
+                            <div style={{ fontSize: 13, color: "#f87171", fontWeight: 800, fontFamily: "monospace" }}>{existingStudent.rollNumber || "â€”"}</div>
                           </div>
                           {existingStudent.department && (
                             <div>
@@ -981,7 +1008,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
                     )}
 
                     <div style={{ background: "#1c1917", padding: "8px 12px", borderRadius: 8, border: "1px solid #78350f", fontSize: 11, color: "#fde68a", lineHeight: 1.6 }}>
-                      <strong>🔒 Registration Blocked:</strong> Please select the correct student. This face cannot be registered again.
+                      <strong>ðŸ”’ Registration Blocked:</strong> Please select the correct student. This face cannot be registered again.
                     </div>
                   </div>
                 ) : (
@@ -1044,7 +1071,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
             }}
           >
             <Camera size={18} />
-            {isAligned ? "📸 CAPTURE BIOMETRIC DATA NOW" : "Align face in green to enable capture"}
+            {isAligned ? "ðŸ“¸ CAPTURE BIOMETRIC DATA NOW" : "Align face in green to enable capture"}
           </button>
         )}
 
@@ -1052,7 +1079,7 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#64748b" }}>
           <span>
             {stage === "aligning"
-              ? (isAligned ? "🟢 Ready to capture" : "🔴 Align inside oval guide")
+              ? (isAligned ? "ðŸŸ¢ Ready to capture" : "ðŸ”´ Align inside oval guide")
               : "Agent: laptop-agent-01 (Active)"}
           </span>
           <button
@@ -1077,11 +1104,20 @@ function CaptureScreenModal({ student, onSuccess, onClose }) {
   );
 }
 
-// ── Class AI Agent Status Banner ──────────────────────────────────────────────
+// â”€â”€ Class AI Agent Status Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AgentStatusBanner() {
   const [open, setOpen]           = useState(false);
   const [agentInfo, setAgentInfo] = useState(null);
   const [checking, setChecking]   = useState(false);
+  const [camName, setCamName]     = useState("Checking hardware...");
+
+  useEffect(() => {
+    import("../../utils/hardwareDevices").then(({ getHardwareDevices }) => {
+      getHardwareDevices().then(({ preferredCamera }) => {
+        setCamName(preferredCamera?.label || "iBall Phocus 18B (External USB Webcam)");
+      });
+    });
+  }, []);
 
   useEffect(() => { checkAgent(); }, []);
 
@@ -1111,13 +1147,20 @@ function AgentStatusBanner() {
     <div style={{ background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>🤖</span>
+          <span style={{ fontSize: 20 }}>ðŸ¤–</span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#e2e8f0" }}>
               Class AI Agent
-              {checking && <span style={{ marginLeft: 8, color: "#a5b4fc", fontSize: 12 }}>● Checking…</span>}
-              {!checking && connected  && <span style={{ marginLeft: 8, color: "#4ade80", fontSize: 12 }}>● Connected</span>}
-              {!checking && agentInfo && !connected && <span style={{ marginLeft: 8, color: "#f87171", fontSize: 12 }}>● Offline</span>}
+              {checking && <span style={{ marginLeft: 8, color: "#a5b4fc", fontSize: 12 }}>â— Checkingâ€¦</span>}
+              {!checking && connected  && (
+                  <>
+                    <span style={{ marginLeft: 8, color: "#4ade80", fontSize: 12 }}>● Connected</span>
+                    <span style={{ marginLeft: 12, padding: "2px 8px", borderRadius: 6, background: "rgba(16, 185, 129, 0.2)", color: "#a7f3d0", fontSize: 11, border: "1px solid rgba(16, 185, 129, 0.4)" }}>
+                      📷 Camera: {camName}
+                    </span>
+                  </>
+                )}
+              {!checking && agentInfo && !connected && <span style={{ marginLeft: 8, color: "#f87171", fontSize: 12 }}>â— Offline</span>}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
               {connected
@@ -1135,17 +1178,17 @@ function AgentStatusBanner() {
             disabled={checking}
             style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "6px 14px", color: "#94a3b8", cursor: checking ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}
           >
-            {checking ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Checking…</> : "Check Status"}
+            {checking ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Checkingâ€¦</> : "Check Status"}
           </button>
           <button onClick={() => setOpen(o => !o)} style={{ background: "#6366f1", border: "none", borderRadius: 8, padding: "6px 14px", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-            {open ? "Hide Info" : "▶ How to Start"}
+            {open ? "Hide Info" : "â–¶ How to Start"}
           </button>
         </div>
       </div>
 
       {!connected && agentInfo && (
         <div style={{ marginTop: 10, padding: "10px 14px", background: "#450a0a", borderRadius: 8, border: "1px solid #7f1d1d", fontSize: 12, color: "#fca5a5" }}>
-          ⚠️ The classroom laptop agent is not connected. Face capture will fail until the agent is running and connected.
+          âš ï¸ The classroom laptop agent is not connected. Face capture will fail until the agent is running and connected.
         </div>
       )}
 
@@ -1157,7 +1200,7 @@ function AgentStatusBanner() {
           {[
             { step: "1", title: "Navigate to the AI service folder",    cmd: "cd C:\\Users\\SUDHEER\\OneDrive\\Documents\\python-face-service" },
             { step: "2", title: "Activate virtual environment",         cmd: ".venv311\\Scripts\\activate" },
-            { step: "3", title: "🚀 Start the Class AI service",        cmd: "python run_classai.py" },
+            { step: "3", title: "ðŸš€ Start the Class AI service",        cmd: "python run_classai.py" },
           ].map(({ step, title, cmd }) => (
             <div key={step} style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
@@ -1170,12 +1213,14 @@ function AgentStatusBanner() {
             </div>
           ))}
           <div style={{ background: "#172554", borderRadius: 8, padding: "12px 14px", marginTop: 12, fontSize: 12, color: "#93c5fd", lineHeight: 1.7 }}>
-            <strong>✅ Success:</strong> The service starts, connects to the server, and shows <code>✅ Authenticated</code> in the logs.<br />
-            After that, click <strong>Check Status</strong> above — it should show <span style={{ color: "#4ade80" }}>● Connected</span>.<br />
-            <strong>⚠️ Keep this PowerShell window open</strong> while using Face Registration.
+            <strong>âœ… Success:</strong> The service starts, connects to the server, and shows <code>âœ… Authenticated</code> in the logs.<br />
+            After that, click <strong>Check Status</strong> above â€” it should show <span style={{ color: "#4ade80" }}>â— Connected</span>.<br />
+            <strong>âš ï¸ Keep this PowerShell window open</strong> while using Face Registration.
           </div>
         </div>
       )}
     </div>
   );
 }
+
+
